@@ -5,57 +5,51 @@
 
   color-scheme: dark;
   color: #f8fafc;
-  background-color: #050505;
+  background-color: #070912;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Premium Refined Palette */
+  /* Refined Palette */
   --primary: #3b82f6;
-  --primary-glow: rgba(59, 130, 246, 0.5);
-  --primary-dim: rgba(59, 130, 246, 0.1);
-  --primary-deep: #1d4ed8;
+  --primary-glow: rgba(59, 130, 246, 0.4);
+  --primary-deep: #2563eb;
 
   --secondary: #a855f7;
-  --secondary-glow: rgba(168, 85, 247, 0.4);
+  --secondary-glow: rgba(168, 85, 247, 0.3);
 
-  --accent: #f59e0b;
-  /* Warmer Gold */
-  --accent-glow: rgba(245, 158, 11, 0.3);
+  --accent: #fbbf24;
+  --accent-glow: rgba(251, 191, 36, 0.2);
 
   --success: #10b981;
   --error: #ef4444;
   --warning: #f59e0b;
 
-  --bg-main: #050505;
-  --bg-card: rgba(10, 10, 12, 0.6);
-  --bg-sidebar: #0a0a0c;
+  --bg-main: #070912;
+  --bg-card: rgba(15, 23, 42, 0.7);
+  --bg-sidebar: #0f172a;
 
-  --text-main: #ffffff;
+  --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --text-dim: #64748b;
 
-  /* Glassmorphism Refined */
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-highlight: rgba(255, 255, 255, 0.05);
-  --glass-bg: rgba(18, 18, 20, 0.6);
-  --glass-bg-hover: rgba(30, 30, 35, 0.7);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(15, 23, 42, 0.65);
+  --glass-bg-hover: rgba(30, 41, 59, 0.8);
+  --glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
 
   --radius-sm: 8px;
-  --radius-md: 16px;
+  --radius-md: 14px;
   --radius-lg: 24px;
-  --radius-xl: 32px;
   --radius-full: 9999px;
 
-  --transition-fast: 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --transition-smooth: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  --transition-bounce: 0.5s cubic-bezier(0.68, -0.6, 0.32, 1.6);
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 
-  --sidebar-width: 280px;
-  --sidebar-collapsed: 80px;
+  --sidebar-width: 300px;
+  --sidebar-collapsed: 85px;
 
   /* Typography Scale */
   --font-xs: 0.75rem;
@@ -64,8 +58,8 @@
   --font-md: 1.125rem;
   --font-lg: 1.25rem;
   --font-xl: 1.5rem;
-  --font-2xl: 2rem;
-  --font-3xl: 2.5rem;
+  --font-2xl: 1.875rem;
+  --font-3xl: 2.25rem;
 }
 
 body {
@@ -73,14 +67,9 @@ body {
   display: flex;
   min-height: 100vh;
   background-color: var(--bg-main);
+  background: radial-gradient(circle at top right, #1e1b4b, #070912);
   color: var(--text-main);
   overflow-x: hidden;
-
-  /* Aurora Background */
-  background:
-    radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.08), transparent 25%);
-  background-attachment: fixed;
 }
 
 /* Custom Scrollbar */

@@ -1,4 +1,5 @@
-import GlassCard from './common/GlassCard';
+import React from 'react';
+import { motion } from 'framer-motion';
 import { getTeamShield } from '../utils/assets';
 import { useTournament } from '../context/TournamentContext';
 import './TeamsPanel.css';
@@ -26,12 +27,16 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
     const { championship, cupData } = useTournament();
 
     const renderTeamCard = (teamName, teamObj = null, idx) => (
-        <GlassCard
+        <motion.div
             key={teamObj?.id || idx}
             variants={itemVariants}
             className={`team-card ${teamObj ? 'clickable' : ''}`}
             onClick={() => teamObj && onTeamClick(teamObj)}
-            hoverEffect={true}
+            whileHover={{
+                scale: 1.02,
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'var(--primary)'
+            }}
             whileTap={{ scale: 0.98 }}
         >
             <div className="team-shield-container">
@@ -46,7 +51,7 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
             <div className="team-card-info">
                 <h3 className="team-card-name">{teamName}</h3>
             </div>
-        </GlassCard>
+        </motion.div>
     );
 
     // If it's a Copa championship, extract participants from cupData
