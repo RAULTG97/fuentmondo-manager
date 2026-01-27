@@ -1,117 +1,93 @@
 import historicalRankings from '../data/historical_rankings.json';
 import { resolveTeamName } from './TeamResolver';
 
-// normalizeName is now provided by TeamResolver, but we can keep a local alias if needed
-// or just use resolveTeamName directly where relevant.
-
 /**
  * Calculates the Head-to-Head standings based on a list of rounds data.
- * Each round object should contain a 'matches' array.
+ * Optimized for clarity and consistency with the new resolution patterns.
  * 
- * @param {Array} roundsData - Array of round objects (from getInternalRankingRound)
+ * @param {Array} roundsData - Array of round objects
  * @returns {Array} Sorted standings array
  */
 export function calculateH2HStandings(roundsData) {
-    const stats = {}; // { teamId: { played, won, drawn, lost, points, gf, ga, name, hist_pts, hist_gen } }
+    const stats = {};
+    const historicalMap = new Map();
 
-    // Create a mapping from normalized name to historical data for easier lookup
-    const normalizedHist = {};
-    Object.keys(historicalRankings).forEach(name => {
-        normalizedHist[resolveTeamName(name)] = historicalRankings[name];
+    // Pre-cache historical data for faster lookup
+    Object.entries(historicalRankings).forEach(([name, data]) => {
+        historicalMap.set(resolveTeamName(name), data);
     });
 
     roundsData.forEach(round => {
-        if (!round.matches) return;
+        if (!round.matches || !round.ranking) return;
 
-        // Create map for THIS ROUND (Indices 1..20 -> Real ID/Name)
-        const roundMap = {};
-        if (round.ranking) {
-            round.ranking.forEach((t, idx) => {
-                const pos = idx + 1;
-                roundMap[pos] = t; // { _id, name, ... }
-            });
-        }
+        // Build a round-specific map for index resolution (1-indexed)
+        const roundTeams = new Map();
+        round.ranking.forEach((t, idx) => roundTeams.set(idx + 1, t));
 
         round.matches.forEach(match => {
-            const pIds = match.p || []; // Indices! e.g. [1, 2]
-            const scores = match.m || [0, 0];
+            const [p1Idx, p2Idx] = match.p || [];
+            const [score1, score2] = match.m || [0, 0];
 
-            if (pIds.length < 2) return;
+            if (p1Idx === undefined || p2Idx === undefined) return;
 
-            // Resolve indices to Real IDs
-            const t1 = roundMap[pIds[0]];
-            const t2 = roundMap[pIds[1]];
+            const team1 = roundTeams.get(p1Idx);
+            const team2 = roundTeams.get(p2Idx);
 
-            if (!t1 || !t2) return; // Skip if mapping fails
+            if (!team1 || !team2) return;
 
-            const idA = t1._id;
-            const idB = t2._id;
-            const scoreA = scores[0];
-            const scoreB = scores[1];
-
-            // Initialize stats if not present
-            if (!stats[idA]) {
-                const hist = normalizedHist[resolveTeamName(t1.name)] || { pts_totales: 0, pts_generales: 0 };
-                stats[idA] = initStats(idA, t1.name, hist.pts_totales, hist.pts_generales);
-            }
-            if (!stats[idB]) {
-                const hist = normalizedHist[resolveTeamName(t2.name)] || { pts_totales: 0, pts_generales: 0 };
-                stats[idB] = initStats(idB, t2.name, hist.pts_totales, hist.pts_generales);
-            }
-
-            // Update Played, GF, GA
-            stats[idA].played++;
-            stats[idB].played++;
-            stats[idA].gf += scoreA;
-            stats[idA].ga += scoreB;
-            stats[idB].gf += scoreB;
-            stats[idB].ga += scoreA;
-
-            // Determine Result
-            if (scoreA > scoreB) {
-                stats[idA].won++;
-                stats[idA].points += 3;
-                stats[idB].lost++;
-            } else if (scoreB > scoreA) {
-                stats[idB].won++;
-                stats[idB].points += 3;
-                stats[idA].lost++;
-            } else {
-                stats[idA].drawn++;
-                stats[idA].points += 1;
-                stats[idB].drawn++;
-                stats[idB].points += 1;
-            }
+            updateTeamStats(stats, team1, score1, score2, historicalMap);
+            updateTeamStats(stats, team2, score2, score1, historicalMap);
         });
     });
 
-    // Convert to array and sort
-    // Sort criteria: Total Points > Total General
-    const standings = Object.values(stats).sort((a, b) => {
+    // Sort: Total Points (Current + Hist) > Total General (Current + Hist)
+    return Object.values(stats).sort((a, b) => {
         const totalA = a.points + a.hist_pts;
         const totalB = b.points + b.hist_pts;
+
         if (totalB !== totalA) return totalB - totalA;
 
         const genA = a.gf + a.hist_gen;
         const genB = b.gf + b.hist_gen;
         return genB - genA;
     });
-
-    return standings;
 }
 
-function initStats(id, name, hist_pts = 0, hist_gen = 0) {
-    return {
-        id,
-        name: name || "Unknown",
-        played: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        points: 0,
-        gf: 0,
-        ga: 0,
-        hist_pts,
-        hist_gen
-    };
+/**
+ * Helper to update or initialize team statistics
+ */
+function updateTeamStats(stats, team, gf, ga, historicalMap) {
+    const id = team._id;
+
+    if (!stats[id]) {
+        const hist = historicalMap.get(resolveTeamName(team.name)) || { pts_totales: 0, pts_generales: 0 };
+        stats[id] = {
+            id,
+            name: team.name || "Unknown",
+            played: 0,
+            won: 0,
+            drawn: 0,
+            lost: 0,
+            points: 0,
+            gf: 0,
+            ga: 0,
+            hist_pts: hist.pts_totales,
+            hist_gen: hist.pts_generales
+        };
+    }
+
+    const s = stats[id];
+    s.played++;
+    s.gf += gf;
+    s.ga += ga;
+
+    if (gf > ga) {
+        s.won++;
+        s.points += 3;
+    } else if (gf < ga) {
+        s.lost++;
+    } else {
+        s.drawn++;
+        s.points += 1;
+    }
 }

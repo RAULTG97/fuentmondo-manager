@@ -1,0 +1,281 @@
+.hall-of-fame-container {
+    padding: 2rem 0;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.hall-of-fame-header {
+    text-align: center;
+    margin-bottom: 5rem;
+    position: relative;
+}
+
+.hall-of-fame-icon-main {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(168, 85, 247, 0.2));
+    border-radius: 50%;
+    margin-bottom: 1.5rem;
+    color: var(--accent);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.2);
+}
+
+.hall-of-fame-title {
+    font-size: 3.5rem;
+    font-weight: 950;
+    letter-spacing: -0.05em;
+    margin: 0;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.hall-of-fame-subtitle {
+    color: var(--text-dim);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    letter-spacing: 0.05em;
+}
+
+/* Timeline */
+.timeline {
+    position: relative;
+    padding: 2rem 0;
+}
+
+.timeline-line {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to bottom,
+            transparent,
+            var(--primary) 15%,
+            var(--secondary) 50%,
+            var(--accent) 85%,
+            transparent);
+    transform: translateX(-50%);
+    border-radius: 2px;
+    opacity: 0.3;
+}
+
+.timeline-item {
+    display: flex;
+    justify-content: flex-end;
+    /* Default relative to content, will be overridden or used by left */
+    padding-right: 50%;
+    position: relative;
+    margin-bottom: 2rem;
+    /* Reduced from 4rem */
+    width: 100%;
+}
+
+.timeline-item.left {
+    justify-content: flex-end;
+    padding-right: 50%;
+    padding-left: 0;
+}
+
+.timeline-item.right {
+    justify-content: flex-start;
+    padding-right: 0;
+    padding-left: 50%;
+}
+
+
+
+.timeline-content {
+    width: 90%;
+    max-width: 400px;
+    padding: 0 2rem;
+}
+
+.champ-card {
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    border-left: 5px solid var(--primary);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.timeline-item.right .champ-card {
+    border-left: none;
+    border-right: 5px solid var(--secondary);
+}
+
+.champ-card:hover {
+    transform: translateY(-5px) scale(1.02);
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.champ-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.tournament-badge {
+    font-size: 10px;
+    font-weight: 900;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-full);
+    letter-spacing: 0.05em;
+}
+
+.tournament-badge.league {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--primary);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.tournament-badge.cup {
+    background: rgba(168, 85, 247, 0.1);
+    color: var(--secondary);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.champ-year {
+    font-weight: 800;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+}
+
+.champ-body {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.champ-shield-wrapper {
+    position: relative;
+    width: 70px;
+    height: 70px;
+}
+
+.shield-glow {
+    position: absolute;
+    inset: -5px;
+    background: radial-gradient(circle, rgba(251, 191, 36, 0.3) 0%, transparent 70%);
+    border-radius: 50%;
+    filter: blur(5px);
+    animation: pulse-glow 3s infinite;
+}
+
+.champ-shield {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    position: relative;
+    z-index: 2;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.champ-info {
+    flex: 1;
+}
+
+.champ-team-name {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -0.02em;
+}
+
+.tournament-name {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.champ-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.star-icon {
+    animation: rotate-star 4s linear infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.3;
+    }
+
+    50% {
+        transform: scale(1.2);
+        opacity: 0.6;
+    }
+}
+
+@keyframes rotate-star {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive Hall of Fame */
+@media (max-width: 768px) {
+    .hall-of-fame-title {
+        font-size: 2.2rem;
+    }
+
+    .timeline-line {
+        left: 30px;
+    }
+
+    .timeline-node {
+        left: 30px;
+    }
+
+    .timeline-item.left,
+    .timeline-item.right {
+        justify-content: flex-start;
+        padding-left: 70px;
+        padding-right: 1rem;
+    }
+
+    .timeline-content {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+    }
+
+    .champ-card {
+        border-left: 5px solid var(--primary) !important;
+        border-right: none !important;
+    }
+
+    .timeline-item.right .timeline-node {
+        border-color: var(--secondary);
+    }
+}

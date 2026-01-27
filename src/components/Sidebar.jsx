@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
     Swords, Table, Trophy, Users, AlertOctagon,
-    Ban, LayoutGrid, ChevronLeft, ChevronRight, LogOut
+    Ban, LayoutGrid, ChevronLeft, ChevronRight, Menu, Award
 } from 'lucide-react';
 import { APP_LOGO } from '../utils/assets';
 import './Sidebar.css';
@@ -15,10 +15,10 @@ const navItems = [
     { id: 'sanctions', label: 'Sanciones', icon: Users },
     { id: 'infractions', label: 'Infracciones', icon: AlertOctagon },
     { id: 'restricted', label: 'Sancionados', icon: Ban },
+    { id: 'hall_of_fame', label: 'HALL OF FAME', icon: Award },
 ];
 
 function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, championships, onChampionshipChange }) {
-
     const isCupMode = championship?.type === 'copa';
 
     const filteredItems = navItems.filter(item => {
@@ -29,45 +29,26 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
 
     return (
         <motion.aside
-            className={`sidebar glass ${isCollapsed ? 'collapsed' : ''}`}
+            className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}
             initial={false}
             animate={{ width: isCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         >
             <div className="sidebar-header">
                 <div className="logo-section">
-                    <img src={APP_LOGO} alt="Logo" className="sidebar-logo" />
+                    <div className="logo-glow">
+                        <img src={APP_LOGO} alt="Logo" className="sidebar-logo" />
+                    </div>
                     {!isCollapsed && (
                         <motion.span
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
                             className="sidebar-title"
                         >
                             Fuentmondo<span>Manager</span>
                         </motion.span>
                     )}
                 </div>
-
-                {!isCollapsed && championships && championships.length > 0 && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="champ-selector-container"
-                    >
-                        <label className="sidebar-field-label">CAMPEONATO ACTIVO</label>
-                        <div className="sidebar-select-wrapper">
-                            <select
-                                value={championship?._id}
-                                onChange={(e) => onChampionshipChange(e.target.value)}
-                                className="sidebar-select"
-                            >
-                                {championships.map(c => (
-                                    <option key={c._id} value={c._id}>{c.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </motion.div>
-                )}
 
             </div>
 
@@ -83,23 +64,23 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                             className={`nav-item ${isActive ? 'active' : ''}`}
                             title={isCollapsed ? item.label : ''}
                         >
-                            <div className="nav-icon">
-                                <Icon size={22} />
+                            <div className="nav-icon-container">
+                                <Icon size={20} />
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="active-glow"
+                                        className="nav-icon-glow"
+                                    />
+                                )}
                             </div>
                             {!isCollapsed && (
-                                <motion.span
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="nav-label"
-                                >
-                                    {item.label}
-                                </motion.span>
+                                <span className="nav-label">{item.label}</span>
                             )}
-                            {isActive && (
+
+                            {isActive && !isCollapsed && (
                                 <motion.div
-                                    layoutId="active-pill"
-                                    className="active-pill"
-                                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                                    layoutId="active-indicator"
+                                    className="active-indicator"
                                 />
                             )}
                         </button>
@@ -108,8 +89,9 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
             </nav>
 
             <div className="sidebar-footer">
-                <button className="collapse-toggle" onClick={onToggle}>
-                    {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+                <button className="collapse-btn" onClick={onToggle}>
+                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    {!isCollapsed && <span>Ocultar menú</span>}
                 </button>
             </div>
         </motion.aside>

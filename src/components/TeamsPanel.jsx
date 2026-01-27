@@ -1,10 +1,58 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { getTeamShield } from '../utils/assets';
 import { useTournament } from '../context/TournamentContext';
 import './TeamsPanel.css';
 
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.04
+        }
+    }
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { type: 'spring', damping: 20, stiffness: 100 }
+    }
+};
+
 const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
     const { championship, cupData } = useTournament();
+
+    const renderTeamCard = (teamName, teamObj = null, idx) => (
+        <motion.div
+            key={teamObj?.id || idx}
+            variants={itemVariants}
+            className={`team-card ${teamObj ? 'clickable' : ''}`}
+            onClick={() => teamObj && onTeamClick(teamObj)}
+            whileHover={{
+                scale: 1.02,
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'var(--primary)'
+            }}
+            whileTap={{ scale: 0.98 }}
+        >
+            <div className="team-shield-container">
+                <img
+                    src={getTeamShield(teamName)}
+                    alt={teamName}
+                    className="team-card-shield"
+                    loading="lazy"
+                    onError={(e) => { e.target.style.opacity = '0'; }}
+                />
+            </div>
+            <div className="team-card-info">
+                <h3 className="team-card-name">{teamName}</h3>
+            </div>
+        </motion.div>
+    );
 
     // If it's a Copa championship, extract participants from cupData
     if (championship?.type === 'copa' && cupData?.rounds) {
@@ -18,37 +66,29 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
         const participantsList = Array.from(participants).sort();
 
         return (
-            <div className="teams-grid-container fade-in">
-                <h3 style={{
-                    color: '#fbbf24',
-                    marginBottom: '1.5rem',
-                    fontSize: '1.5rem',
-                    fontWeight: 'bold',
-                    textAlign: 'center'
-                }}>
+            <motion.div
+                className="teams-grid-container"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+            >
+                <motion.h3
+                    variants={itemVariants}
+                    style={{
+                        color: 'var(--accent)',
+                        marginBottom: '2rem',
+                        fontSize: 'var(--font-xl)',
+                        fontWeight: '900',
+                        textAlign: 'center',
+                        letterSpacing: '-0.02em'
+                    }}
+                >
                     Participantes Copa Piraña
-                </h3>
+                </motion.h3>
                 <div className="teams-grid">
-                    {participantsList.map((teamName, idx) => (
-                        <div
-                            key={idx}
-                            className="team-card"
-                        >
-                            <div className="team-shield-container">
-                                <img
-                                    src={getTeamShield(teamName)}
-                                    alt={teamName}
-                                    className="team-card-shield"
-                                    onError={(e) => { e.target.style.display = 'none'; }}
-                                />
-                            </div>
-                            <div className="team-card-info">
-                                <h3 className="team-card-name">{teamName}</h3>
-                            </div>
-                        </div>
-                    ))}
+                    {participantsList.map((name, idx) => renderTeamCard(name, null, idx))}
                 </div>
-            </div>
+            </motion.div>
         );
     }
 
@@ -56,29 +96,16 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
     const sortedTeams = [...h2hStandings].sort((a, b) => a.name.localeCompare(b.name));
 
     return (
-        <div className="teams-grid-container fade-in">
+        <motion.div
+            className="teams-grid-container"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
             <div className="teams-grid">
-                {sortedTeams.map((team) => (
-                    <div
-                        key={team.id}
-                        className="team-card clickable"
-                        onClick={() => onTeamClick(team)}
-                    >
-                        <div className="team-shield-container">
-                            <img
-                                src={getTeamShield(team.name)}
-                                alt={team.name}
-                                className="team-card-shield"
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                        </div>
-                        <div className="team-card-info">
-                            <h3 className="team-card-name">{team.name}</h3>
-                        </div>
-                    </div>
-                ))}
+                {sortedTeams.map((team, idx) => renderTeamCard(team.name, team, idx))}
             </div>
-        </div>
+        </motion.div>
     );
 };
 
