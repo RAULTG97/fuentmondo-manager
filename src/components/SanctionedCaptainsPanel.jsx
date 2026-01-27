@@ -31,16 +31,8 @@ const SanctionedCaptainsPanel = () => {
 
     const currentRound = rounds.find(r => r._id === selectedRoundId)?.number || 0;
 
-    // Group all sanctions into a single list
-    const allSanctions = [];
-    Object.values(sanctionsData).forEach(teamSanctions => {
-        Object.values(teamSanctions).forEach(s => {
-            allSanctions.push({
-                ...s,
-                player: s.playerName // Standardize name
-            });
-        });
-    });
+    // Use activeSanctions directly from the calculated data
+    const allSanctions = sanctionsData.activeSanctions || [];
 
     const filteredTotal = allSanctions.filter(s =>
         s.teamName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
