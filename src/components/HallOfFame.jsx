@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Star, Calendar } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
+import { getAssetPath } from '../utils/path';
 import './HallOfFame.css';
 
 const champions = [
@@ -39,7 +40,7 @@ const champions = [
 
 const HallOfFame = () => {
     React.useEffect(() => {
-        const audio = new Audio('/halloffame.mp3');
+        const audio = new Audio(getAssetPath('/halloffame.mp3'));
         audio.volume = 0.5;
 
         const playPromise = audio.play();
@@ -104,7 +105,7 @@ const HallOfFame = () => {
                                                 src={getTeamShield(champ.team)}
                                                 alt={champ.team}
                                                 className="champ-shield"
-                                                onError={(e) => { e.target.src = '/logo.jpeg'; }}
+                                                onError={(e) => { e.target.src = getAssetPath('/logo.jpeg'); }}
                                             />
                                         </div>
                                         <div className="champ-info">

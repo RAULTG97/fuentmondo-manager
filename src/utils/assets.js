@@ -30,4 +30,4 @@ export const getTeamShield = (teamName) => {
 };
 
 export const APP_LOGO = getAssetPath('/logo.jpeg');
-export const COPA_LOGO = getAssetPath(`/escudos/${encodeURIComponent('CopaPiraña')}.jpeg`);
+export const COPA_LOGO = getAssetPath(`/escudos/${encodeURIComponent('CopaPirana')}.jpeg`);
