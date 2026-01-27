@@ -1,0 +1,14 @@
+.app-root {
+  width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--bg-main);
+}
+
+#root {
+  padding: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
