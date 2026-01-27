@@ -1,4 +1,4 @@
-import { getTeamShield } from '../utils/assets';
+import { getTeamShield, COPA_LOGO } from '../utils/assets';
 import { Loader2 } from 'lucide-react';
 
 function CopaPanel({ cupData, loading, championship }) {
@@ -138,7 +138,7 @@ function CopaPanel({ cupData, loading, championship }) {
                             alignItems: 'center'
                         }}>
                             <img
-                                src="/escudos/CopaPiraña.jpeg"
+                                src={COPA_LOGO}
                                 alt="Copa Piraña Trophy"
                                 style={{
                                     width: '180px',
