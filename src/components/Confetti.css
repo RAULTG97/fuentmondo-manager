@@ -1,0 +1,45 @@
+.confetti-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 50;
+}
+
+.confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 16px;
+    background: #ffd700;
+    top: -20px;
+    opacity: 0;
+}
+
+@keyframes confetti-fall {
+    0% {
+        top: -10%;
+        transform: translateX(0) rotateX(0) rotateY(0);
+        opacity: 1;
+    }
+
+    25% {
+        transform: translateX(25px) rotateX(90deg) rotateY(90deg);
+    }
+
+    50% {
+        transform: translateX(-25px) rotateX(180deg) rotateY(180deg);
+    }
+
+    75% {
+        transform: translateX(25px) rotateX(270deg) rotateY(270deg);
+    }
+
+    100% {
+        top: 110%;
+        transform: translateX(-25px) rotateX(360deg) rotateY(360deg);
+        opacity: 0;
+    }
+}

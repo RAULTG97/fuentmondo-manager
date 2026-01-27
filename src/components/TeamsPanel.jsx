@@ -26,15 +26,15 @@ const itemVariants = {
 const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
     const { championship, cupData } = useTournament();
 
-    const renderTeamCard = (teamName, teamObj = null, idx) => (
+    const renderTeamCard = React.useCallback((teamName, teamObj = null, idx) => (
         <motion.div
-            key={teamObj?.id || idx}
+            key={teamObj?.id || `${teamName}-${idx}`}
             variants={itemVariants}
             className={`team-card ${teamObj ? 'clickable' : ''}`}
             onClick={() => teamObj && onTeamClick(teamObj)}
             whileHover={{
                 scale: 1.02,
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
                 borderColor: 'var(--primary)'
             }}
             whileTap={{ scale: 0.98 }}
@@ -52,19 +52,30 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
                 <h3 className="team-card-name">{teamName}</h3>
             </div>
         </motion.div>
-    );
+    ), [onTeamClick]);
 
-    // If it's a Copa championship, extract participants from cupData
-    if (championship?.type === 'copa' && cupData?.rounds) {
-        const participants = new Set();
-        cupData.rounds.forEach(round => {
-            round.matches?.forEach(match => {
-                if (match.home?.team?.name) participants.add(match.home.team.name);
-                if (match.away?.team?.name) participants.add(match.away.team.name);
+    const participantsList = React.useMemo(() => {
+        if (championship?.type === 'copa' && cupData?.rounds) {
+            const participants = new Set();
+            cupData.rounds.forEach(round => {
+                round.matches?.forEach(match => {
+                    if (match.home?.team?.name) participants.add(match.home.team.name);
+                    if (match.away?.team?.name) participants.add(match.away.team.name);
+                });
             });
-        });
-        const participantsList = Array.from(participants).sort();
+            return Array.from(participants).sort();
+        }
+        return [];
+    }, [championship?.type, cupData?.rounds]);
 
+    const sortedTeamsList = React.useMemo(() => {
+        if (championship?.type !== 'copa' && h2hStandings) {
+            return [...h2hStandings].sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return [];
+    }, [championship?.type, h2hStandings]);
+
+    if (championship?.type === 'copa') {
         return (
             <motion.div
                 className="teams-grid-container"
@@ -92,9 +103,6 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
         );
     }
 
-    // For league championships, show standings
-    const sortedTeams = [...h2hStandings].sort((a, b) => a.name.localeCompare(b.name));
-
     return (
         <motion.div
             className="teams-grid-container"
@@ -103,7 +111,7 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
             animate="visible"
         >
             <div className="teams-grid">
-                {sortedTeams.map((team, idx) => renderTeamCard(team.name, team, idx))}
+                {sortedTeamsList.map((team, idx) => renderTeamCard(team.name, team, idx))}
             </div>
         </motion.div>
     );

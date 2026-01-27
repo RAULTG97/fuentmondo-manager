@@ -25,6 +25,7 @@ import CopaPanel from './CopaPanel';
 import LineupViewer from './LineupViewer';
 import MatchDetail from './MatchDetail';
 import HallOfFame from './HallOfFame';
+import Loader from './Loader';
 
 import TableSkeleton from './skeletons/TableSkeleton';
 import CardSkeleton from './skeletons/CardSkeleton';
@@ -170,8 +171,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
 
                 <header className="dashboard-header animate-in">
                     <div className="header-info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.25rem' }}>
-                            <div style={{ color: 'var(--primary)', background: 'rgba(59, 130, 246, 0.1)', padding: '0.4rem', borderRadius: 'var(--radius-sm)' }}>
+                        <div className="header-title-row">
+                            <div className="header-icon-box">
                                 <Activity size={20} />
                             </div>
                             <h2>{activeTab === 'hall_of_fame' ? 'Hall of Fame' : championship.name}</h2>
@@ -179,16 +180,16 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                 {activeTab === 'hall_of_fame' ? 'Histórico' : (championship.type === 'copa' ? 'Copa' : 'Liga')}
                             </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div className="header-subtitle-row">
                             <Settings size={14} color="var(--text-dim)" />
-                            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--font-xs)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <p className="header-subtitle">
                                 Fuentmondo Manager
                             </p>
                         </div>
                     </div>
 
                     <div className="header-selectors">
-                        {/* Primary Championship Selector - Standardized for all views */}
+                        {/* Primary Championship Selector */}
                         <div className="premium-selector championship-main">
                             <div className="selector-icon">
                                 <Trophy size={18} />
@@ -212,7 +213,9 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
 
                         {rounds.length > 0 && (activeTab === 'matchups' || activeTab === 'standings') && (
                             <div className="premium-selector round-secondary">
-                                <Calendar size={18} color="var(--secondary)" />
+                                <div className="selector-icon">
+                                    <Calendar size={18} />
+                                </div>
                                 <div className="selector-content">
                                     <span className="selector-label">Jornada</span>
                                     <div className="current-value">
@@ -238,10 +241,15 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 <AnimatePresence mode="wait">
                     <motion.section
                         key={activeTab}
-                        initial={{ opacity: 0, scale: 0.99, y: 10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.99, y: -10 }}
-                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{
+                            type: "spring",
+                            stiffness: 300,
+                            damping: 30,
+                            opacity: { duration: 0.2 }
+                        }}
                         className="page-wrapper glass-premium"
                         style={{ padding: activeTab === 'standings' ? '0' : '2rem' }}
                     >
@@ -283,18 +291,15 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                     position: 'fixed',
                     bottom: '2rem',
                     right: '2rem',
-                    background: 'var(--bg-card)',
-                    padding: '1rem 1.5rem',
+                    background: 'var(--glass-bg)',
+                    backdropFilter: 'blur(12px)',
+                    padding: '0.75rem 1.5rem',
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--glass-border)',
                     boxShadow: 'var(--glass-shadow)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '1rem',
                     zIndex: 1000
                 }}>
-                    <div className="loader" style={{ width: '20px', height: '20px', border: '2px solid var(--primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                    <span style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>Calculando {calculationProgress}%</span>
+                    <Loader text={`Calculando ${calculationProgress}%`} type="inline" />
                 </div>
             )}
         </div>

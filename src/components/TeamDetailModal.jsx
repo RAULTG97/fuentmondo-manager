@@ -13,26 +13,39 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, selectedRo
     const currentRoundNum = rounds.find(r => r._id === selectedRoundId)?.number || (rounds.length > 0 ? rounds[rounds.length - 1].number : 0);
 
 
-    // Use canonical name for all lookups
-    const teamName = team.name;
-    const teamId = team.id || team._id;
+    // Memoize basic team info
+    const { teamName, teamId } = React.useMemo(() => ({
+        teamName: team.name,
+        teamId: team.id || team._id
+    }), [team]);
 
-    // Get full stats from h2hStandings (which is already aggregated)
-    const fullStats = h2hStandings.find(t => t.id === teamId) || team;
+    // Memoize h2h stats lookup
+    const fullStats = React.useMemo(() =>
+        h2hStandings.find(t => t.id === teamId) || team
+        , [h2hStandings, teamId, team]);
 
-    const stats = sanctionsData.teamStats?.[teamId] || {};
-    const infractions = sanctionsData.infractions?.filter(inf => inf.teamId === teamId) || [];
-    const activeSanctions = sanctionsData.activeSanctions?.filter(s => s.teamId === teamId) || [];
+    // Memoize sanctions data transformations
+    const { stats, infractions, activeSanctions } = React.useMemo(() => ({
+        stats: sanctionsData.teamStats?.[teamId] || {},
+        infractions: sanctionsData.infractions?.filter(inf => inf.teamId === teamId) || [],
+        activeSanctions: sanctionsData.activeSanctions?.filter(s => s.teamId === teamId) || []
+    }), [sanctionsData, teamId]);
 
-    // Retrieve last match data directly from the enriched team object (populated in Dashboard.jsx)
-    const lastMatchData = fullStats.lastMatchData;
-    const lastLineup = lastMatchData?.lineup || [];
-    const lastScore = lastMatchData?.score || 0;
-    const lastRoundNum = lastMatchData?.round || '--';
+    // Retrieve last match data directly from the enriched team object
+    const { lastLineup, lastScore, lastRoundNum } = React.useMemo(() => {
+        const lastMatchData = fullStats.lastMatchData;
+        return {
+            lastLineup: lastMatchData?.lineup || [],
+            lastScore: lastMatchData?.score || 0,
+            lastRoundNum: lastMatchData?.round || '--'
+        };
+    }, [fullStats.lastMatchData]);
 
-    const totalPts = fullStats.points + (fullStats.hist_pts || 0);
-    const totalGen = fullStats.gf + (fullStats.hist_gen || 0);
-    const position = h2hStandings.findIndex(t => t.id === teamId) + 1;
+    const { totalPts, totalGen, position } = React.useMemo(() => ({
+        totalPts: fullStats.points + (fullStats.hist_pts || 0),
+        totalGen: fullStats.gf + (fullStats.hist_gen || 0),
+        position: h2hStandings.findIndex(t => t.id === teamId) + 1
+    }), [fullStats, h2hStandings, teamId]);
 
     return (
         <div className="modal-overlay fade-in" onClick={onClose}>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Trophy, Star, Calendar } from 'lucide-react';
+import { Trophy, Star, Calendar, Crown } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 import { getAssetPath } from '../utils/path';
 import './HallOfFame.css';
@@ -72,6 +72,18 @@ const HallOfFame = () => {
                 <p className="hall-of-fame-subtitle">Inmortalizando a los campeones de nuestra historia</p>
             </motion.div>
 
+            {/* Split Headers */}
+            <div className="hof-split-header">
+                <div className="hof-col-header left">
+                    <Trophy size={24} className="text-secondary" />
+                    <h3>COPA</h3>
+                </div>
+                <div className="hof-col-header right">
+                    <Crown size={24} className="text-primary" />
+                    <h3>LIGA</h3>
+                </div>
+            </div>
+
             <div className="timeline">
                 <div className="timeline-line" />
 
@@ -84,13 +96,13 @@ const HallOfFame = () => {
                         <motion.div
                             key={`${champ.year}-${champ.team}`}
                             className={`timeline-item ${position}`}
-                            initial={{ opacity: 0, x: isCup ? -50 : 50 }}
+                            initial={{ opacity: 0, x: isCup ? -30 : 30 }}
                             whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true, margin: "-50px" }}
-                            transition={{ duration: 0.6, delay: index * 0.1 }}
+                            transition={{ duration: 0.5, delay: index * 0.1 }}
                         >
                             <div className="timeline-content">
-                                <div className="champ-card glass-premium">
+                                <div className={`champ-card glass-premium ${champ.type}`}>
                                     <div className="champ-header">
                                         <span className={`tournament-badge ${champ.type}`}>
                                             {champ.type === 'cup' ? '🏆 COPA' : '⚔️ LIGA'}

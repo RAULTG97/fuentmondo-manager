@@ -43,6 +43,7 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                         <motion.span
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 }}
                             className="sidebar-title"
                         >
                             Fuentmondo<span>Manager</span>
@@ -64,25 +65,26 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                             className={`nav-item ${isActive ? 'active' : ''}`}
                             title={isCollapsed ? item.label : ''}
                         >
+                            {isActive && (
+                                <motion.div
+                                    layoutId="mobile-indicator"
+                                    className="mobile-indicator"
+                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                            )}
+
                             <div className="nav-icon-container">
-                                <Icon size={20} />
+                                <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 2} />
                                 {isActive && (
                                     <motion.div
                                         layoutId="active-glow"
                                         className="nav-icon-glow"
+                                        transition={{ duration: 0.2 }}
                                     />
                                 )}
                             </div>
-                            {!isCollapsed && (
-                                <span className="nav-label">{item.label}</span>
-                            )}
 
-                            {isActive && !isCollapsed && (
-                                <motion.div
-                                    layoutId="active-indicator"
-                                    className="active-indicator"
-                                />
-                            )}
+                            <span className="nav-label">{item.label}</span>
                         </button>
                     );
                 })}

@@ -10,9 +10,8 @@
 }
 
 .team-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(15, 23, 42, 0.6);
+    /* Solid/semi-transparent background instead of blur */
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     padding: 2rem 1.5rem;

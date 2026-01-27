@@ -1,13 +1,14 @@
 .hall-of-fame-container {
     padding: 2rem 0;
-    max-width: 1000px;
-    margin: 0 auto;
     width: 100%;
+    margin: 0 auto;
+    max-width: 1200px;
+    overflow: hidden;
 }
 
 .hall-of-fame-header {
     text-align: center;
-    margin-bottom: 5rem;
+    margin-bottom: 2rem;
     position: relative;
 }
 
@@ -15,18 +16,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(168, 85, 247, 0.2));
     border-radius: 50%;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     color: var(--accent);
     border: 1px solid rgba(251, 191, 36, 0.3);
     box-shadow: 0 0 30px rgba(251, 191, 36, 0.2);
 }
 
 .hall-of-fame-title {
-    font-size: 3.5rem;
+    font-size: 3rem;
     font-weight: 950;
     letter-spacing: -0.05em;
     margin: 0;
@@ -39,83 +40,139 @@
 
 .hall-of-fame-subtitle {
     color: var(--text-dim);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
     margin-top: 0.5rem;
     letter-spacing: 0.05em;
+}
+
+/* --- Split Headers --- */
+.hof-split-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3rem;
+    padding: 0 10%;
+    position: relative;
+    z-index: 10;
+}
+
+.hof-col-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 2rem;
+    border-radius: 50px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(8px);
+    width: 200px;
+    justify-content: center;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.hof-col-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+}
+
+.hof-col-header.left h3 {
+    color: var(--secondary);
+}
+
+.hof-col-header.right h3 {
+    color: var(--primary);
+}
+
+.text-secondary {
+    color: var(--secondary);
+}
+
+.text-primary {
+    color: var(--primary);
 }
 
 /* Timeline */
 .timeline {
     position: relative;
     padding: 2rem 0;
+    width: 100%;
 }
 
 .timeline-line {
     position: absolute;
     left: 50%;
-    top: 0;
+    top: -2rem;
     bottom: 0;
     width: 4px;
     background: linear-gradient(to bottom,
             transparent,
-            var(--primary) 15%,
-            var(--secondary) 50%,
-            var(--accent) 85%,
+            var(--secondary) 20%,
+            var(--primary) 80%,
             transparent);
     transform: translateX(-50%);
     border-radius: 2px;
-    opacity: 0.3;
+    opacity: 0.2;
 }
 
 .timeline-item {
     display: flex;
     justify-content: flex-end;
-    /* Default relative to content, will be overridden or used by left */
-    padding-right: 50%;
     position: relative;
-    margin-bottom: 2rem;
-    /* Reduced from 4rem */
+    margin-bottom: 3rem;
     width: 100%;
+    box-sizing: border-box;
 }
 
 .timeline-item.left {
     justify-content: flex-end;
-    padding-right: 50%;
+    padding-right: 52%;
     padding-left: 0;
 }
 
 .timeline-item.right {
     justify-content: flex-start;
     padding-right: 0;
-    padding-left: 50%;
+    padding-left: 52%;
 }
-
-
 
 .timeline-content {
-    width: 90%;
-    max-width: 400px;
-    padding: 0 2rem;
+    width: 100%;
+    max-width: 450px;
+    position: relative;
+    z-index: 2;
 }
 
+/* Card Styling */
 .champ-card {
     padding: 1.5rem;
     border-radius: var(--radius-lg);
-    border-left: 5px solid var(--primary);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
     transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    position: relative;
+    overflow: hidden;
 }
 
-.timeline-item.right .champ-card {
-    border-left: none;
-    border-right: 5px solid var(--secondary);
+.champ-card.cup {
+    border-right: 4px solid var(--secondary);
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(270deg, rgba(168, 85, 247, 0.05) 0%, transparent 100%);
+}
+
+.champ-card.league {
+    border-left: 4px solid var(--primary);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
 }
 
 .champ-card:hover {
     transform: translateY(-5px) scale(1.02);
-    border-color: var(--accent);
-    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
 }
 
 .champ-header {
@@ -131,6 +188,7 @@
     padding: 0.3rem 0.6rem;
     border-radius: var(--radius-full);
     letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
 .tournament-badge.league {
@@ -149,6 +207,9 @@
     font-weight: 800;
     color: var(--text-dim);
     font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
 }
 
 .champ-body {
@@ -158,10 +219,26 @@
     margin-bottom: 1.5rem;
 }
 
+/* Left side layout symmetry (Mirror effect) */
+.timeline-item.left .champ-header {
+    flex-direction: row-reverse;
+}
+
+.timeline-item.left .champ-body {
+    flex-direction: row-reverse;
+    text-align: right;
+}
+
+/* ensure text align right propagates */
+.timeline-item.left .champ-info {
+    align-items: flex-end;
+}
+
 .champ-shield-wrapper {
     position: relative;
-    width: 70px;
-    height: 70px;
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
 }
 
 .shield-glow {
@@ -188,15 +265,16 @@
 
 .champ-team-name {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     font-weight: 900;
     color: #fff;
     letter-spacing: -0.02em;
+    line-height: 1.1;
 }
 
 .tournament-name {
     margin: 0.2rem 0 0;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
     font-weight: 600;
 }
@@ -209,7 +287,7 @@
     padding-top: 1rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--accent);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.2em;
     text-transform: uppercase;
@@ -245,23 +323,35 @@
 
 /* Responsive Hall of Fame */
 @media (max-width: 768px) {
-    .hall-of-fame-title {
-        font-size: 2.2rem;
+    .hof-split-header {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 0 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .hof-col-header {
+        width: 100%;
     }
 
     .timeline-line {
-        left: 30px;
+        left: 20px;
+        transform: none;
+        /* Reset transform on mobile if needed */
     }
 
-    .timeline-node {
-        left: 30px;
+    .timeline-item {
+        /* Reset to standard mobile flow */
+        padding-right: 0;
+        /* Reset base padding */
     }
 
     .timeline-item.left,
     .timeline-item.right {
         justify-content: flex-start;
-        padding-left: 70px;
+        padding-left: 50px;
         padding-right: 1rem;
+        margin-bottom: 1.5rem;
     }
 
     .timeline-content {
@@ -270,12 +360,36 @@
         padding: 0;
     }
 
-    .champ-card {
-        border-left: 5px solid var(--primary) !important;
-        border-right: none !important;
+    .champ-card.cup,
+    .champ-card.league {
+        border-right: none;
+        border-left: 4px solid;
     }
 
-    .timeline-item.right .timeline-node {
+    .champ-card.cup {
         border-color: var(--secondary);
+        background: linear-gradient(90deg, rgba(168, 85, 247, 0.05) 0%, transparent 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        /* Reset border */
+    }
+
+    .champ-card.league {
+        border-color: var(--primary);
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Disable symmetry on mobile for readability */
+    .timeline-item.left .champ-header {
+        flex-direction: row;
+    }
+
+    .timeline-item.left .champ-body {
+        flex-direction: row;
+        text-align: left;
+    }
+
+    .timeline-item.left .champ-info {
+        align-items: flex-start;
     }
 }
