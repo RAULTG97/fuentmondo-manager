@@ -428,6 +428,37 @@
     }
 }
 
+.matchups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+/* Extra small devices (iPhone X etc) */
+@media (max-width: 480px) {
+    .dashboard-content {
+        padding: 1rem 0.75rem;
+        /* Tighter padding */
+        padding-bottom: 6rem;
+        /* More space for bottom nav */
+        gap: 1.5rem;
+    }
+
+    .header-info h2 {
+        font-size: 1.5rem;
+        /* Smaller title */
+    }
+
+    .mobile-branding-bar {
+        padding: 0.75rem 1rem;
+    }
+
+    .matchups-grid {
+        grid-template-columns: 1fr;
+        /* Full width cards on mobile */
+    }
+}
+
 /* Global utility for horizontal scroll on mobile */
 .responsive-table-container {
     width: 100%;

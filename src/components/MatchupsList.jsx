@@ -7,7 +7,7 @@ function MatchupsList({ matches, onMatchClick, isLiveRound }) {
     }
 
     return (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+        <div className="matchups-grid">
             {matches.map((m, idx) => {
                 // Match structure from Internal API:
                 // p: [idTeamA, idTeamB] (IDs) -- difficult if we don't have names map
