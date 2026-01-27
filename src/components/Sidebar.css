@@ -238,9 +238,9 @@
         background: transparent !important;
         transform: none !important;
         min-width: 62px;
-        /* Compacter width */
+        width: auto !important;
+        /* Reset inherited width */
         flex-shrink: 0;
-        /* Prevent shrinking */
     }
 
     .nav-icon-container {
