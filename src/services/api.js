@@ -2,7 +2,7 @@ import axios from 'axios';
 import { CONFIG } from '../config';
 
 const api = axios.create({
-    baseURL: '/api',
+    baseURL: import.meta.env.PROD ? 'https://api.futmondo.com/external/kong' : '/api',
     params: {
         apiKey: CONFIG.API_KEY
     }
@@ -24,10 +24,12 @@ api.interceptors.response.use(
 );
 
 const internalApi = axios.create({
-    baseURL: '/internal-api',
+    baseURL: import.meta.env.PROD ? 'https://api.futmondo.com' : '/internal-api',
     headers: {
         'Content-Type': 'application/json',
-        'Origin': 'https://app.futmondo.com'
+        // 'Origin' is unsafe to set in browser (refused by Chrome). 
+        // We only set it in Dev (where proxy adds it) or if we were server-side.
+        // In Prod (GH Pages), we can't spoof it.
     }
 });
 
