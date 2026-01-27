@@ -10,18 +10,15 @@
 }
 
 .team-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-md);
+    /* Visuals handled by GlassCard component */
     padding: 2rem 1.5rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     transition: all var(--transition-smooth);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 100%;
+    /* Ensure full height */
 }
 
 .team-card.clickable {

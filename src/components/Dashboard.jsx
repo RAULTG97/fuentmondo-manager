@@ -14,6 +14,7 @@ import { useTournament } from '../context/TournamentContext';
 import { useTournamentData } from '../hooks/useTournamentData';
 
 import Sidebar from './Sidebar';
+import MobileNav from './MobileNav';
 import MatchupsList from './MatchupsList';
 import SanctionsPanel from './SanctionsPanel';
 import InfractionsPanel from './InfractionsPanel';
@@ -278,10 +279,17 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 )}
             </AnimatePresence>
 
+            {/* Mobile Navigation */}
+            <MobileNav
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                championship={championship}
+            />
+
             {calculationProgress > 0 && calculationProgress < 100 && (
                 <div style={{
                     position: 'fixed',
-                    bottom: '2rem',
+                    bottom: '5rem', /* Adjusted for mobile nav */
                     right: '2rem',
                     background: 'var(--bg-card)',
                     padding: '1rem 1.5rem',
