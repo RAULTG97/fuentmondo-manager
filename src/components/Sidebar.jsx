@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     Swords, Table, Trophy, Users, AlertOctagon,
     Ban, LayoutGrid, ChevronLeft, ChevronRight, Menu, Award
@@ -18,7 +19,8 @@ const navItems = [
     { id: 'hall_of_fame', label: 'HALL OF FAME', icon: Award },
 ];
 
-function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, championships, onChampionshipChange }) {
+function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship }) {
+    const [showMore, setShowMore] = useState(false);
     const isCupMode = championship?.type === 'copa';
 
     const filteredItems = navItems.filter(item => {
@@ -26,6 +28,15 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
         if (item.mode === 'league' && isCupMode) return false;
         return true;
     });
+
+    // Mobile primary items (first 4)
+    const mobilePrimary = filteredItems.slice(0, 4);
+    const mobileSecondary = filteredItems.slice(4);
+
+    const handleTabClick = (id) => {
+        onTabChange(id);
+        setShowMore(false);
+    };
 
     return (
         <motion.aside
@@ -50,44 +61,85 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                         </motion.span>
                     )}
                 </div>
-
             </div>
 
             <nav className="sidebar-nav">
-                {filteredItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
+                <div className="mobile-nav-container">
+                    {(window.innerWidth <= 768 ? mobilePrimary : filteredItems).map((item) => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
 
-                    return (
-                        <button
-                            key={item.id}
-                            onClick={() => onTabChange(item.id)}
-                            className={`nav-item ${isActive ? 'active' : ''}`}
-                            title={isCollapsed ? item.label : ''}
-                        >
-                            {isActive && (
-                                <motion.div
-                                    layoutId="mobile-indicator"
-                                    className="mobile-indicator"
-                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                />
-                            )}
-
-                            <div className="nav-icon-container">
-                                <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 2} />
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={() => handleTabClick(item.id)}
+                                className={`nav-item ${isActive ? 'active' : ''}`}
+                                title={isCollapsed ? item.label : ''}
+                            >
                                 {isActive && (
                                     <motion.div
-                                        layoutId="active-glow"
-                                        className="nav-icon-glow"
-                                        transition={{ duration: 0.2 }}
+                                        layoutId="mobile-indicator"
+                                        className="mobile-indicator"
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                     />
                                 )}
-                            </div>
 
-                            <span className="nav-label">{item.label}</span>
+                                <div className="nav-icon-container">
+                                    <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 2} />
+                                    {isActive && (
+                                        <motion.div
+                                            layoutId="active-glow"
+                                            className="nav-icon-glow"
+                                            transition={{ duration: 0.2 }}
+                                        />
+                                    )}
+                                </div>
+
+                                <span className="nav-label">{item.label}</span>
+                            </button>
+                        );
+                    })}
+
+                    {window.innerWidth <= 768 && (
+                        <button
+                            className={`nav-item ${showMore ? 'active' : ''}`}
+                            onClick={() => setShowMore(!showMore)}
+                        >
+                            <div className="nav-icon-container">
+                                <Menu size={20} />
+                            </div>
+                            <span className="nav-label">Más</span>
                         </button>
-                    );
-                })}
+                    )}
+                </div>
+
+                <AnimatePresence>
+                    {showMore && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            className="mobile-more-menu"
+                        >
+                            <div className="more-menu-grid">
+                                {mobileSecondary.map((item) => {
+                                    const Icon = item.icon;
+                                    const isActive = activeTab === item.id;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handleTabClick(item.id)}
+                                            className={`more-menu-item ${isActive ? 'active' : ''}`}
+                                        >
+                                            <Icon size={20} />
+                                            <span>{item.label}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </nav>
 
             <div className="sidebar-footer">

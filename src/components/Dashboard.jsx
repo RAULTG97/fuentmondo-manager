@@ -101,8 +101,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                 </tr>
                                 <tr className="table-header-sub">
                                     <th>Pos</th><th>Equipo</th>
-                                    <th style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
-                                    <th style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
+                                    <th style={{ color: 'var(--primary)', fontWeight: 800 }} className="sticky-col-3">Total</th>
+                                    <th style={{ color: 'var(--accent)', fontWeight: 800 }} className="sticky-col-4">Gen</th>
 
                                     {/* 1st Leg Columns */}
                                     <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Pts</th>
@@ -142,8 +142,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                             </div>
                                         </td>
                                         {/* Global Scores First */}
-                                        <td style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
-                                        <td style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
+                                        <td className="sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
+                                        <td className="sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
 
                                         {/* 1st Leg Data */}
                                         <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
