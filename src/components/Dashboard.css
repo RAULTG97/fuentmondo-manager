@@ -233,43 +233,58 @@
         table-layout: fixed;
     }
 
-    .standings-view th:nth-child(2),
-    .standings-view td:nth-child(2) {
-        min-width: 100px !important;
-        left: 40px !important;
-        max-width: 100px;
-    }
-
-    .standings-view th:nth-child(1),
-    .standings-view td:nth-child(1) {
-        min-width: 40px !important;
-    }
-
-    .standings-view td {
-        padding: 0.6rem 0.3rem !important;
-        font-size: 0.75rem !important;
-    }
-
-    .global-col {
-        display: table-cell !important;
-        width: 60px !important;
-        min-width: 60px !important;
-        text-align: center;
-    }
-
-    /* Make Global column (Total) sticky on mobile */
-    .standings-view th:nth-child(3),
-    .standings-view td:nth-child(3) {
+    /* Explicit Sticky Classes for Mobile */
+    .sticky-col-1 {
         position: sticky !important;
-        left: 170px !important;
-        z-index: 19 !important;
+        left: 0 !important;
+        z-index: 100 !important;
         background: #0f172a !important;
+        min-width: 40px !important;
+        width: 40px !important;
         border-right: 1px solid var(--glass-border) !important;
     }
 
+    .sticky-col-2 {
+        position: sticky !important;
+        left: 40px !important;
+        z-index: 100 !important;
+        background: #0f172a !important;
+        min-width: 130px !important;
+        width: 130px !important;
+        border-right: 2px solid rgba(59, 130, 246, 0.3) !important;
+    }
+
+    .sticky-col-3 {
+        position: sticky !important;
+        left: 170px !important;
+        z-index: 100 !important;
+        background: #0f172a !important;
+        min-width: 60px !important;
+        width: 60px !important;
+        border-right: 1px solid var(--glass-border) !important;
+        text-align: center;
+    }
+
+    /* Combination header for top row */
+    .sticky-col-1-2 {
+        position: sticky !important;
+        left: 0 !important;
+        z-index: 110 !important;
+        background: #0f172a !important;
+    }
+
+    /* Ensure headers stay above cells */
+    thead th.sticky-col-1,
+    thead th.sticky-col-2,
+    thead th.sticky-col-3,
+    thead th.sticky-col-1-2 {
+        z-index: 110 !important;
+        background: #1e293b !important;
+    }
+
     .clickable-header.collapsed {
-        width: 50px !important;
-        min-width: 50px !important;
+        width: 60px !important;
+        min-width: 60px !important;
     }
 
     .summary-col {
@@ -331,9 +346,8 @@
     min-width: 60px;
 }
 
-/* Sticky Columns Logic */
-.standings-view th:nth-child(1),
-.standings-view td:nth-child(1) {
+/* Base Sticky classes (non-mobile defaults) */
+.sticky-col-1 {
     position: sticky;
     left: 0;
     z-index: 20;
@@ -343,16 +357,7 @@
     text-align: center;
 }
 
-@media (max-width: 768px) {
-
-    .standings-view th:nth-child(1),
-    .standings-view td:nth-child(1) {
-        min-width: 40px !important;
-    }
-}
-
-.standings-view th:nth-child(2),
-.standings-view td:nth-child(2) {
+.sticky-col-2 {
     position: sticky;
     left: 60px;
     z-index: 20;
@@ -361,14 +366,10 @@
     min-width: 180px;
 }
 
-@media (max-width: 768px) {
-
-    .standings-view th:nth-child(2),
-    .standings-view td:nth-child(2) {
-        left: 40px !important;
-        min-width: 130px !important;
-        max-width: 130px !important;
-    }
+.sticky-col-3 {
+    /* Only sticky on mobile, see media query above */
+    background: #0f172a;
+    text-align: center;
 }
 
 /* Header special z-index */
@@ -949,29 +950,23 @@
 }
 
 /* Sticky Column Overrides for new styles */
-.standings-view td:nth-child(1),
-.standings-view td:nth-child(2) {
-    /* REMOVED backdrop-filter for performance */
-    background-color: #0f172a;
-    /* Fallback solid color */
+.sticky-col-1,
+.sticky-col-2,
+.sticky-col-3 {
+    background-color: #0f172a !important;
+    /* Force solid background to hide scrolling content */
     z-index: 20;
-}
-
-/* We need to set explicit backgrounds for sticky cols to cover scrolling content, 
-   but varying it for podiums is tricky. We'll use a dark tint. */
-.standings-view td:nth-child(1),
-.standings-view td:nth-child(2) {
-    background-color: #0f172a;
 }
 
 
 /* --- Podium Styles --- */
 
 /* Gold (1st) */
-.standings-view tbody tr:nth-child(1) td:nth-child(1),
-.standings-view tbody tr:nth-child(1) td:nth-child(2) {
+.standings-view tbody tr:nth-child(1) .sticky-col-1,
+.standings-view tbody tr:nth-child(1) .sticky-col-2 {
     border-left: 3px solid #fbbf24;
-    background: linear-gradient(90deg, rgba(251, 191, 36, 0.1), rgba(10, 15, 29, 0.95));
+    background: #14140a !important;
+    /* Hard solid color for podium sticky */
 }
 
 .standings-view tbody tr:nth-child(1) td {
@@ -993,10 +988,11 @@
 
 
 /* Silver (2nd) */
-.standings-view tbody tr:nth-child(2) td:nth-child(1),
-.standings-view tbody tr:nth-child(2) td:nth-child(2) {
+.standings-view tbody tr:nth-child(2) .sticky-col-1,
+.standings-view tbody tr:nth-child(2) .sticky-col-2 {
     border-left: 3px solid #94a3b8;
-    background: linear-gradient(90deg, rgba(148, 163, 184, 0.1), rgba(10, 15, 29, 0.95));
+    background: #0f141e !important;
+    /* Hard solid color for podium sticky */
 }
 
 .standings-view tbody tr:nth-child(2) td {
@@ -1009,10 +1005,11 @@
 }
 
 /* Bronze (3rd) */
-.standings-view tbody tr:nth-child(3) td:nth-child(1),
-.standings-view tbody tr:nth-child(3) td:nth-child(2) {
+.standings-view tbody tr:nth-child(3) .sticky-col-1,
+.standings-view tbody tr:nth-child(3) .sticky-col-2 {
     border-left: 3px solid #b45309;
-    background: linear-gradient(90deg, rgba(180, 83, 9, 0.1), rgba(10, 15, 29, 0.95));
+    background: #190f0a !important;
+    /* Hard solid color for podium sticky */
 }
 
 .standings-view tbody tr:nth-child(3) td {

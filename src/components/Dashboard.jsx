@@ -116,9 +116,9 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                         <table>
                             <thead>
                                 <tr className="table-header-main">
-                                    <th colSpan={2}></th>
+                                    <th className="sticky-col-1-2" colSpan={2}></th>
                                     <th colSpan={2} className="hide-mobile" style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
-                                    <th className="show-mobile-table-cell" style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
+                                    <th className="show-mobile-table-cell sticky-col-3" style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
                                     <th
                                         colSpan={expandedVuelta === 1 ? 2 : 1}
                                         className={`clickable-header ${expandedVuelta === 1 ? 'expanded' : 'collapsed'}`}
@@ -141,8 +141,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                     </th>
                                 </tr>
                                 <tr className="table-header-sub">
-                                    <th>Pos</th><th>Equipo</th>
-                                    <th className="global-col" style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
+                                    <th className="sticky-col-1">Pos</th><th className="sticky-col-2">Equipo</th>
+                                    <th className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
                                     <th className="global-col hide-mobile" style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
 
                                     {/* 1st Leg Columns */}
@@ -163,8 +163,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                             <tbody>
                                 {h2hStandings.map((team, idx) => (
                                     <tr key={team.id}>
-                                        <td style={{ fontWeight: 800 }}>{idx + 1}</td>
-                                        <td className="team-cell">
+                                        <td className="sticky-col-1" style={{ fontWeight: 800 }}>{idx + 1}</td>
+                                        <td className="team-cell sticky-col-2">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                                                 <img
                                                     src={getTeamShield(team.name)}
@@ -183,7 +183,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                             </div>
                                         </td>
                                         {/* Global Scores First */}
-                                        <td className="global-col" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
+                                        <td className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
                                         <td className="global-col hide-mobile" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
 
                                         {/* 1st Leg Data */}
