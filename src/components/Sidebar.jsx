@@ -19,7 +19,7 @@ const navItems = [
     { id: 'hall_of_fame', label: 'HALL OF FAME', icon: Award },
 ];
 
-function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship }) {
+function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, championships, onChampionshipChange }) {
     const [showMore, setShowMore] = useState(false);
     const isCupMode = championship?.type === 'copa';
 
