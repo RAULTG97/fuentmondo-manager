@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertCircle, ChevronDown, ChevronRight, Euro } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Euro, Search } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 
 function SanctionsPanel({ sanctionsData }) {
@@ -18,22 +18,42 @@ function SanctionsPanel({ sanctionsData }) {
 
     return (
         <div className="sanctions-panel">
-            <div className="search-container" style={{ marginBottom: '1rem' }}>
-                <input
-                    type="text"
-                    placeholder="Buscar equipo..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="sidebar-select"
-                    style={{ width: '100%', padding: '0.8rem 1rem' }}
-                />
-            </div>
+            <div className="dashboard-header" style={{ border: 'none', padding: 0, marginBottom: '2rem', alignItems: 'flex-start' }}>
+                <div className="header-info">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', webkitTextFillColor: 'initial' }}>Resumen de Sanciones</h2>
+                        <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5' }}>
+                            {sortedTeams.length} Equipos
+                        </span>
+                    </div>
+                </div>
 
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <AlertCircle color="#ef4444" size={24} />
-                <p style={{ margin: 0, fontSize: '0.9rem', color: '#fca5a5' }}>
-                    Sanciones acumuladas: Repetición de capitán, jugadores duplicados H2H, y duplicidad de club.
-                </p>
+                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', width: '100%', maxWidth: '800px' }}>
+                    <div className="round-picker" style={{ flex: 1, minWidth: '280px', gap: '0.75rem' }}>
+                        <Search size={18} color="var(--text-dim)" />
+                        <input
+                            type="text"
+                            placeholder="Buscar equipo..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-main)',
+                                outline: 'none',
+                                fontSize: 'var(--font-sm)',
+                                width: '100%'
+                            }}
+                        />
+                    </div>
+
+                    <div className="round-picker" style={{ gap: '0.8rem', padding: '0.6rem 1rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
+                        <AlertCircle color="#ef4444" size={16} />
+                        <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: '#fca5a5', fontWeight: 500 }}>
+                            Repetición de capitán, jugadores duplicados H2H, y duplicidad de club.
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>

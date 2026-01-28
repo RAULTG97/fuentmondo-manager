@@ -31,7 +31,7 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
         <motion.aside
             className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}
             initial={false}
-            animate={{ width: isCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)' }}
+            animate={{ width: window.innerWidth <= 768 ? '100%' : (isCollapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-width)') }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         >
             <div className="sidebar-header">
@@ -46,7 +46,7 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                             transition={{ delay: 0.1 }}
                             className="sidebar-title"
                         >
-                            Fuentmondo<span>Manager</span>
+                            Fuentmondo
                         </motion.span>
                     )}
                 </div>

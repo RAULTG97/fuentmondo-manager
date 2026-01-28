@@ -16,7 +16,9 @@ function App() {
         const list = data.data || data.championships || [];
         setChampionships(list);
         if (list.length > 0) {
-          const preferred = list.find(c => c.name.includes("COPA PIRAÑA")) || list.find(c => c.name.includes("Champions")) || list[0];
+          const preferred = list.find(c => c.name.toUpperCase().includes("CHAMPIONS")) ||
+            list.find(c => c.name.toUpperCase().includes("COPA PIRAÑA")) ||
+            list[0];
           setSelectedChampId(preferred._id);
         }
         setLoading(false);

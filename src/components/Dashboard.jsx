@@ -13,6 +13,7 @@ import { APP_LOGO } from '../utils/assets';
 import { useTournament } from '../context/TournamentContext';
 import { useTournamentData } from '../hooks/useTournamentData';
 
+import PremiumDropdown from './common/PremiumDropdown';
 import Sidebar from './Sidebar';
 import MatchupsList from './MatchupsList';
 import SanctionsPanel from './SanctionsPanel';
@@ -47,6 +48,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     const [selectedUserTeam, setSelectedUserTeam] = useState(null);
     const [selectedMatch, setSelectedMatch] = useState(null);
     const [selectedDetailTeam, setSelectedDetailTeam] = useState(null);
+    const [expandedVuelta, setExpandedVuelta] = useState(null); // null | 1 | 2
 
     // Sync championship with context
     useEffect(() => {
@@ -79,15 +81,42 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                             <thead>
                                 <tr className="table-header-main">
                                     <th colSpan={2}></th>
-                                    <th colSpan={2} style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center' }}>1ª Vuelta</th>
-                                    <th colSpan={6} style={{ background: 'rgba(168, 85, 247, 0.05)', textAlign: 'center' }}>2ª Vuelta</th>
                                     <th colSpan={2} style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
+                                    <th
+                                        colSpan={expandedVuelta === 1 ? 2 : 1}
+                                        className={`clickable-header ${expandedVuelta === 1 ? 'expanded' : 'collapsed'}`}
+                                        onClick={() => setExpandedVuelta(expandedVuelta === 1 ? null : 1)}
+                                        style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center', cursor: 'pointer' }}
+                                    >
+                                        1ª Vuelta {expandedVuelta === 1 ? '▾' : '▸'}
+                                    </th>
+                                    <th
+                                        colSpan={expandedVuelta === 2 ? 6 : 1}
+                                        className={`clickable-header ${expandedVuelta === 2 ? 'expanded' : 'collapsed'}`}
+                                        onClick={() => setExpandedVuelta(expandedVuelta === 2 ? null : 2)}
+                                        style={{ background: 'rgba(168, 85, 247, 0.05)', textAlign: 'center', cursor: 'pointer' }}
+                                    >
+                                        2ª Vuelta {expandedVuelta === 2 ? '▾' : '▸'}
+                                    </th>
                                 </tr>
                                 <tr className="table-header-sub">
                                     <th>Pos</th><th>Equipo</th>
-                                    <th>Ptos</th><th>Gen</th>
-                                    <th>Pts</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th><th>GF</th>
-                                    <th style={{ color: 'var(--primary)' }}>Total</th><th style={{ color: 'var(--accent)' }}>Gen</th>
+                                    <th style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
+                                    <th style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
+
+                                    {/* 1st Leg Columns */}
+                                    <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Pts</th>
+                                    <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Gen</th>
+                                    {expandedVuelta !== 1 && <th className="summary-col">Pts</th>}
+
+                                    {/* 2nd Leg Columns */}
+                                    <th className={expandedVuelta === 2 ? '' : 'hide-column'}>Pts</th>
+                                    <th className={expandedVuelta === 2 ? '' : 'hide-column'}>PJ</th>
+                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PG</th>
+                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PE</th>
+                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PP</th>
+                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>GF</th>
+                                    {expandedVuelta !== 2 && <th className="summary-col">Pts</th>}
                                 </tr>
                             </thead>
                             <tbody>
@@ -106,22 +135,29 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                                 <span
                                                     className="clickable-team"
                                                     onClick={() => setSelectedDetailTeam(team)}
-                                                    style={{ fontWeight: 600 }}
+                                                    style={{ fontWeight: 600, fontSize: '0.9rem' }}
                                                 >
                                                     {team.name}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
-                                        <td style={{ color: 'var(--text-dim)' }}>{team.hist_gen}</td>
-                                        <td style={{ fontWeight: 700 }}>{team.points}</td>
-                                        <td>{team.played}</td>
-                                        <td style={{ color: 'var(--success)', fontWeight: 600 }}>{team.won}</td>
-                                        <td>{team.drawn}</td>
-                                        <td style={{ color: 'var(--error)' }}>{team.lost}</td>
-                                        <td>{team.gf}</td>
+                                        {/* Global Scores First */}
                                         <td style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
                                         <td style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
+
+                                        {/* 1st Leg Data */}
+                                        <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
+                                        <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_gen}</td>
+                                        {expandedVuelta !== 1 && <td className="summary-col" style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{team.hist_pts}</td>}
+
+                                        {/* 2nd Leg Data */}
+                                        <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.points}</td>
+                                        <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.played}</td>
+                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--success)', fontWeight: 600 }}>{team.won}</td>
+                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.drawn}</td>
+                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--error)' }}>{team.lost}</td>
+                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.gf}</td>
+                                        {expandedVuelta !== 2 && <td className="summary-col" style={{ opacity: 0.6 }}>{team.points}</td>}
                                     </tr>
                                 ))}
                             </tbody>
@@ -165,7 +201,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 <div className="mobile-branding-bar">
                     <div className="logo-section">
                         <img src={APP_LOGO} alt="Logo" className="mobile-logo" />
-                        <h1 className="mobile-title">Fuentmondo<span>Manager</span></h1>
+                        <h1 className="mobile-title">Fuentmondo</h1>
                     </div>
                 </div>
 
@@ -183,57 +219,31 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                         <div className="header-subtitle-row">
                             <Settings size={14} color="var(--text-dim)" />
                             <p className="header-subtitle">
-                                Fuentmondo Manager
+                                Fuentmondo
                             </p>
                         </div>
                     </div>
 
                     <div className="header-selectors">
-                        {/* Primary Championship Selector */}
-                        <div className="premium-selector championship-main">
-                            <div className="selector-icon">
-                                <Trophy size={18} />
-                            </div>
-                            <div className="selector-content">
-                                <span className="selector-label">Campeonato Actual</span>
-                                <div className="current-value">
-                                    {championship?.name}
-                                </div>
-                                <select
-                                    value={championship?._id}
-                                    onChange={(e) => onChampionshipChange(e.target.value)}
-                                >
-                                    {championships.map(c => (
-                                        <option key={c._id} value={c._id}>{c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <ChevronDown size={14} className="select-arrow" />
-                        </div>
+                        <PremiumDropdown
+                            label="Campeonato Actual"
+                            value={championship?._id}
+                            options={championships.map(c => ({ id: c._id, label: c.name }))}
+                            onChange={onChampionshipChange}
+                            icon={Trophy}
+                            className="championship-main"
+                        />
 
                         {rounds.length > 0 && (activeTab === 'matchups' || activeTab === 'standings') && (
-                            <div className="premium-selector round-secondary">
-                                <div className="selector-icon">
-                                    <Calendar size={18} />
-                                </div>
-                                <div className="selector-content">
-                                    <span className="selector-label">Jornada</span>
-                                    <div className="current-value">
-                                        Jornada {rounds.find(r => r._id === selectedRoundId)?.number || 'Seleccionar'}
-                                    </div>
-                                    <select
-                                        value={selectedRoundId || ''}
-                                        onChange={(e) => setSelectedRoundId(e.target.value)}
-                                    >
-                                        {rounds.map(r => (
-                                            <option key={r._id} value={r._id}>
-                                                Jornada {r.number}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <ChevronDown size={14} className="select-arrow" />
-                            </div>
+                            <PremiumDropdown
+                                label="Jornada"
+                                value={selectedRoundId}
+                                options={rounds.map(r => ({ id: r._id, label: `Jornada ${r.number}` }))}
+                                onChange={setSelectedRoundId}
+                                icon={Calendar}
+                                className="round-secondary"
+                                displayValue={selectedRoundId ? `Jornada ${rounds.find(r => r._id === selectedRoundId)?.number}` : 'Seleccionar'}
+                            />
                         )}
                     </div>
                 </header>
@@ -250,8 +260,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                             damping: 30,
                             opacity: { duration: 0.2 }
                         }}
-                        className="page-wrapper glass-premium"
-                        style={{ padding: activeTab === 'standings' ? '0' : '2rem' }}
+                        className={`page-wrapper glass-premium ${activeTab === 'standings' ? 'no-padding' : ''}`}
                     >
                         {renderMainContent()}
                     </motion.section>
