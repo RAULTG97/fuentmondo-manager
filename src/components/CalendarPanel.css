@@ -72,6 +72,21 @@
 .calendar-cell {
     min-width: 65px;
     vertical-align: middle;
+    transition: all 0.2s ease;
+}
+
+.calendar-cell.clickable {
+    cursor: pointer;
+}
+
+.calendar-cell.clickable:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.calendar-cell.clickable:hover .opp-shield-micro {
+    transform: scale(1.1);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3)) grayscale(0);
+    opacity: 1;
 }
 
 .cell-content {

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { getTeamShield } from '../utils/assets';
 import './CalendarPanel.css';
 
-const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick }) => {
+const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick, onMatchClick }) => {
     // Filter rounds from 20 to 38
     const calendarRounds = useMemo(() =>
         allRounds.filter(r => r.number >= 20 && r.number <= 38).sort((a, b) => a.number - b.number)
@@ -46,7 +46,8 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick }) => {
                         opponentName,
                         result,
                         matchId: match.id,
-                        status: round.status
+                        status: round.status,
+                        fullMatch: match
                     };
                 }
             });
@@ -94,7 +95,11 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick }) => {
                                     if (!match) return <td key={r.number} className="calendar-cell empty">-</td>;
 
                                     return (
-                                        <td key={r.number} className="calendar-cell">
+                                        <td
+                                            key={r.number}
+                                            className={`calendar-cell ${match.fullMatch ? 'clickable' : ''}`}
+                                            onClick={() => match.fullMatch && onMatchClick(match.fullMatch)}
+                                        >
                                             <div className="cell-content">
                                                 <img
                                                     src={getTeamShield(match.opponentName)}

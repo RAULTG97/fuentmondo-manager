@@ -221,7 +221,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
             case 'copa':
                 return <CopaPanel cupData={cupData} loading={loadingCup} championship={championship} />;
             case 'calendar':
-                return <CalendarPanel allRounds={allRounds} h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} />;
+                return <CalendarPanel allRounds={allRounds} h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} onMatchClick={setSelectedMatch} />;
             case 'hall_of_fame':
                 return <HallOfFame />;
             default: return null;
