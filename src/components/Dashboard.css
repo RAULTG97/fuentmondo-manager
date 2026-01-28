@@ -239,30 +239,54 @@
         left: 0 !important;
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 40px !important;
-        width: 40px !important;
+        min-width: 35px !important;
+        width: 35px !important;
         border-right: 1px solid var(--glass-border) !important;
     }
 
     .sticky-col-2 {
         position: sticky !important;
-        left: 40px !important;
+        left: 35px !important;
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 130px !important;
-        width: 130px !important;
+        min-width: 105px !important;
+        width: 105px !important;
         border-right: 2px solid rgba(59, 130, 246, 0.3) !important;
     }
 
     .sticky-col-3 {
         position: sticky !important;
-        left: 170px !important;
+        left: 140px !important;
+        /* 35 + 105 */
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 60px !important;
-        width: 60px !important;
+        min-width: 55px !important;
+        width: 55px !important;
         border-right: 1px solid var(--glass-border) !important;
         text-align: center;
+    }
+
+    .sticky-col-4 {
+        position: sticky !important;
+        left: 195px !important;
+        /* 35 + 105 + 55 */
+        z-index: 100 !important;
+        background: #0f172a !important;
+        min-width: 55px !important;
+        width: 55px !important;
+        border-right: 1px solid var(--glass-border) !important;
+        text-align: center;
+    }
+
+    .sticky-col-3-4 {
+        position: sticky !important;
+        left: 140px !important;
+        z-index: 110 !important;
+        background: #1e293b !important;
+        min-width: 110px !important;
+        width: 110px !important;
+        text-align: center;
+        border-right: 1px solid var(--glass-border) !important;
     }
 
     /* Combination header for top row */
@@ -271,12 +295,16 @@
         left: 0 !important;
         z-index: 110 !important;
         background: #0f172a !important;
+        min-width: 140px !important;
+        width: 140px !important;
     }
 
     /* Ensure headers stay above cells */
     thead th.sticky-col-1,
     thead th.sticky-col-2,
     thead th.sticky-col-3,
+    thead th.sticky-col-4,
+    thead th.sticky-col-3-4,
     thead th.sticky-col-1-2 {
         z-index: 110 !important;
         background: #1e293b !important;
@@ -517,7 +545,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 150px;
+    max-width: 300px;
 }
 
 /* The invisible select covering the whole card */

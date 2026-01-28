@@ -251,6 +251,38 @@
         padding-bottom: env(safe-area-inset-bottom, 15px);
     }
 
+    .nav-container-mobile {
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Scroll Indicators / Fades */
+    .nav-container-mobile::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 40px;
+        background: linear-gradient(to left, rgba(10, 15, 28, 0.95), transparent);
+        z-index: 10;
+        pointer-events: none;
+    }
+
+    .nav-container-mobile::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 20px;
+        background: linear-gradient(to right, rgba(10, 15, 28, 0.95), transparent);
+        z-index: 10;
+        pointer-events: none;
+        opacity: 0.5;
+    }
+
     .sidebar-header,
     .sidebar-footer {
         display: none !important;
@@ -260,13 +292,16 @@
         flex-direction: row;
         width: 100%;
         height: 100%;
-        padding: 0.5rem;
+        padding: 0.5rem 1rem;
         gap: 0;
         justify-content: flex-start;
         align-items: stretch;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
+        scroll-snap-type: x mandatory;
+        padding-right: 2rem;
+        /* Ensure last item isn't totally hidden by fade */
     }
 
     .sidebar-nav::-webkit-scrollbar {
@@ -284,10 +319,10 @@
         background: transparent !important;
         transform: none !important;
         border: none;
-        min-width: 72px;
-        /* Consistency in width */
+        min-width: 80px;
         flex: 1 0 auto;
-        /* Allow items to keep their min-width but grow */
+        width: auto !important;
+        scroll-snap-align: center;
     }
 
     .nav-item.active {
