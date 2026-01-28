@@ -357,16 +357,73 @@
     object-fit: contain;
 }
 
+.opp-meta .opp-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
 .opp-meta h4 {
     margin: 0;
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: white;
+    font-weight: 800;
+}
+
+.opp-pos-badge {
+    font-size: 0.7rem;
+    font-weight: 900;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.opp-stats-pills {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.opp-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(59, 130, 246, 0.08);
+    padding: 0.25rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.opp-pill span {
+    font-size: 0.6rem;
+    font-weight: 800;
+    color: rgba(59, 130, 246, 0.6);
+    letter-spacing: 0.05em;
+}
+
+.opp-pill strong {
+    font-size: 0.85rem;
+    color: #f1f5f9;
+}
+
+.opp-pill.accent {
+    background: rgba(139, 92, 246, 0.08);
+    border-color: rgba(139, 92, 246, 0.15);
+}
+
+.opp-pill.accent span {
+    color: rgba(139, 92, 246, 0.6);
 }
 
 .opp-meta p {
-    margin: 0.2rem 0 0;
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.4);
+    margin: 0.3rem 0 0;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.25);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
 }
 
 .opp-pitch {

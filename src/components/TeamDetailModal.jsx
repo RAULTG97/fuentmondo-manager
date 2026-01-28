@@ -59,6 +59,9 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds,
             opponentName: oppName,
             opponentId: oppId,
             opponentStats: oppStats,
+            opponentPos: h2hStandings.findIndex(t => t.id === oppId) + 1,
+            opponentTotalPts: oppStats ? (oppStats.points + (oppStats.hist_pts || 0)) : 0,
+            opponentTotalGen: oppStats ? (oppStats.gf + (oppStats.hist_gen || 0)) : 0,
             isHome
         };
     }, [allRounds, teamId, h2hStandings]);
@@ -209,8 +212,20 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds,
                                         <div className="opponent-info-header">
                                             <img src={getTeamShield(nextMatchData.opponentName)} alt="" className="med-shield" />
                                             <div className="opp-meta">
-                                                <h4>{nextMatchData.opponentName}</h4>
-                                                <p>Última alineación utilizada</p>
+                                                <div className="opp-name-row">
+                                                    <h4>{nextMatchData.opponentName}</h4>
+                                                    <span className={`opp-pos-badge pos-${nextMatchData.opponentPos}`}>#{nextMatchData.opponentPos}</span>
+                                                </div>
+                                                <div className="opp-stats-pills">
+                                                    <div className="opp-pill">
+                                                        <span>TOTAL</span>
+                                                        <strong>{nextMatchData.opponentTotalPts}</strong>
+                                                    </div>
+                                                    <div className="opp-pill accent">
+                                                        <span>GEN</span>
+                                                        <strong>{nextMatchData.opponentTotalGen}</strong>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="pitch-wrapper-mini opp-pitch">
