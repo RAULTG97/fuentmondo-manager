@@ -47,7 +47,7 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                             transition={{ delay: 0.1 }}
                             className="sidebar-title"
                         >
-                            Fuentmondo
+                            Fuentmondo Manager
                         </motion.span>
                     )}
                 </div>
