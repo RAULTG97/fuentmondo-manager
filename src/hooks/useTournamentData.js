@@ -443,10 +443,28 @@ export const useTournamentData = (activeTab) => {
                 teamList.__championshipName = championship.name;
 
                 // --- OPTIMIZATION: Early Standings Calculate & Set ---
-                const initialStandings = calculateH2HStandings(allRoundDataCombined.filter(rd => {
+                const filteredRounds = allRoundDataCombined.filter(rd => {
                     const rObj = rounds.find(r => r._id === rd._id || r.number === rd.number);
                     return rObj && (rObj.status === 'past' || rObj.status === 'historical' || (rObj.date && new Date(rObj.date) < now));
-                }));
+                });
+                const initialStandings = calculateH2HStandings(filteredRounds);
+
+                // --- NEW: Populate initial lastMatchData from cached lineups ---
+                const reverseRoundsForInitial = [...filteredRounds].sort((a, b) => b.number - a.number);
+                initialStandings.forEach(team => {
+                    for (const rd of reverseRoundsForInitial) {
+                        const m = rd.matches?.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
+                        if (m && (m.lineupA || m.lineupB)) {
+                            team.lastMatchData = {
+                                round: rd.number,
+                                score: m.homeTeamId === team.id ? m.homeScore : m.awayScore,
+                                lineup: m.homeTeamId === team.id ? m.lineupA : m.lineupB
+                            };
+                            break; // Found the most recent one
+                        }
+                    }
+                });
+
                 setH2HStandings(initialStandings);
                 setStandingsLoaded(true);
                 setLoadingStandings(false); // Can hide standings loader early
