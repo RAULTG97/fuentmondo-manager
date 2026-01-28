@@ -1,5 +1,5 @@
 .teams-grid-container {
-    animation: fade-in 0.8s var(--transition-smooth);
+    width: 100%;
 }
 
 .teams-grid {

@@ -1,0 +1,197 @@
+.round-navigator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 1rem;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    margin-bottom: 1.5rem;
+}
+
+.nav-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    height: 40px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+}
+
+.nav-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.nav-button:hover:not(:disabled) {
+    background: var(--primary);
+    color: var(--bg);
+    border-color: var(--primary);
+    box-shadow: 0 0 20px rgba(var(--primary-rgb), 0.3);
+}
+
+.nav-button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.round-info-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.round-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 150px;
+}
+
+.return-button.expanded {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1rem;
+    background: rgba(var(--primary-rgb), 0.1);
+    border: 1px solid rgba(var(--primary-rgb), 0.3);
+    border-radius: 20px;
+    color: var(--primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.return-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.return-button.expanded:hover {
+    background: var(--primary);
+    color: var(--bg);
+    border-color: var(--primary);
+    box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.2);
+}
+
+.round-number {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.number-highlight {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-left: 0.25rem;
+}
+
+.round-status {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.6rem;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-current {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.status-past {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.status-future {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.status-historical {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(16, 185, 129, 0.6);
+    }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .round-navigator {
+        padding: 0.75rem;
+        gap: 0.5rem;
+        justify-content: space-between;
+    }
+
+    .nav-button {
+        min-width: 44px;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        z-index: 2;
+    }
+
+    .nav-label {
+        display: none !important;
+        visibility: hidden;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+    }
+
+    .round-info-container {
+        flex: 1;
+        width: auto;
+        margin-bottom: 0;
+        order: 0;
+    }
+
+    .round-info {
+        min-width: auto;
+    }
+
+    .return-button.expanded {
+        position: static;
+        transform: none;
+        width: 100%;
+        margin-top: 0.75rem;
+        z-index: 1;
+    }
+
+    .return-label {
+        font-size: 0.65rem;
+    }
+}

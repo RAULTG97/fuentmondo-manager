@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
-import { X, Trophy, AlertTriangle, ShieldAlert, History, User, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Trophy, AlertTriangle, History, User, Loader2, ChevronDown, ChevronUp, Activity } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 import SoccerPitch from './SoccerPitch';
 import './TeamDetailModal.css';
 
-const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, selectedRoundId, onClose }) => {
-    const [isLineupExpanded, setIsLineupExpanded] = useState(false);
-    const [isCaptainHistoryExpanded, setIsCaptainHistoryExpanded] = useState(false);
+const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds, selectedRoundId, currentRoundNumber, onClose }) => {
+    const [expandedSections, setExpandedSections] = useState({
+        lineup: false,
+        nextOpponent: false,
+        discipline: false,
+        captains: false
+    });
 
     if (!team) return null;
 
-    const currentRoundNum = rounds.find(r => r._id === selectedRoundId)?.number || (rounds.length > 0 ? rounds[rounds.length - 1].number : 0);
+    const toggleSection = (section) => {
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    // Use global currentRoundNumber if provided, fallback to navigation-based lookup
+    const currentRoundNum = currentRoundNumber || rounds.find(r => {
+        if (typeof selectedRoundId === 'number') return r.number === selectedRoundId;
+        return r._id === selectedRoundId;
+    })?.number || (rounds.length > 0 ? rounds[rounds.length - 1].number : 0);
 
 
     // Memoize basic team info
@@ -24,12 +36,40 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, selectedRo
         h2hStandings.find(t => t.id === teamId) || team
         , [h2hStandings, teamId, team]);
 
-    // Memoize sanctions data transformations
+    // Next Opponent Logic
+    const nextMatchData = React.useMemo(() => {
+        if (!allRounds || allRounds.length === 0) return null;
+
+        // Find the next round (first one that is 'future' or 'current')
+        const nextRound = [...allRounds].sort((a, b) => a.number - b.number)
+            .find(r => r.status === 'future' || r.status === 'current');
+
+        if (!nextRound || !nextRound.matches) return null;
+
+        const match = nextRound.matches.find(m => m.homeTeamId === teamId || m.awayTeamId === teamId);
+        if (!match) return null;
+
+        const isHome = match.homeTeamId === teamId;
+        const oppId = isHome ? match.awayTeamId : match.homeTeamId;
+        const oppName = isHome ? match.awayName : match.homeName;
+        const oppStats = h2hStandings.find(t => t.id === oppId);
+
+        return {
+            roundNum: nextRound.number,
+            opponentName: oppName,
+            opponentId: oppId,
+            opponentStats: oppStats,
+            isHome
+        };
+    }, [allRounds, teamId, h2hStandings]);
+
     const { stats, infractions, activeSanctions } = React.useMemo(() => ({
         stats: sanctionsData.teamStats?.[teamId] || {},
         infractions: sanctionsData.infractions?.filter(inf => inf.teamId === teamId) || [],
-        activeSanctions: sanctionsData.activeSanctions?.filter(s => s.teamId === teamId) || []
-    }), [sanctionsData, teamId]);
+        activeSanctions: sanctionsData.activeSanctions?.filter(s =>
+            s.teamId === teamId && s.outTeamUntil >= currentRoundNum
+        ) || []
+    }), [sanctionsData, teamId, currentRoundNum]);
 
     // Retrieve last match data directly from the enriched team object
     const { lastLineup, lastScore, lastRoundNum } = React.useMemo(() => {
@@ -47,128 +87,197 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, selectedRo
         position: h2hStandings.findIndex(t => t.id === teamId) + 1
     }), [fullStats, h2hStandings, teamId]);
 
+    const last5Matches = (fullStats.matchHistory || []).slice(0, 5);
+
     return (
         <div className="modal-overlay fade-in" onClick={onClose}>
             <div className="modal-content team-detail-card" onClick={e => e.stopPropagation()}>
                 <button className="close-btn" onClick={onClose}><X size={24} /></button>
 
-                <div className="team-detail-header">
-                    <div className="team-detail-shield-large">
-                        <img src={getTeamShield(teamName)} alt={teamName} />
+                {/* COMPACT REFINED HEADER */}
+                <div className="team-detail-header-compact">
+                    <div className="header-top">
+                        <div className="team-detail-shield-small">
+                            <img src={getTeamShield(teamName)} alt={teamName} />
+                        </div>
+                        <div className="header-title-box">
+                            <h2 className="team-detail-name">{teamName}</h2>
+                            <div className="header-meta">
+                                <span className={`rank-badge pos-${position}`}>Posición #{position || '--'}</span>
+                                <span className="league-badge">Liga Fuentmondo</span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="header-info-main">
-                        <h2 className="team-detail-name">{teamName}</h2>
-                        <div className="team-detail-rank-info">
-                            <div className="stat-pill pos">
-                                <span className="pill-label">PUESTO</span>
-                                <span className="pill-val">#{position || '--'}</span>
-                            </div>
-                            <div className="stat-pill pts">
-                                <span className="pill-label">PUNTOS</span>
-                                <span className="pill-val">{totalPts}</span>
-                            </div>
-                            <div className="stat-pill gen">
-                                <span className="pill-label">GENERAL</span>
-                                <span className="pill-val">{totalGen}</span>
-                            </div>
+                    <div className="header-stats-row">
+                        <div className="stat-group">
+                            <span className="label">PUNTOS TOTAL</span>
+                            <span className="value">{totalPts}</span>
+                        </div>
+                        <div className="stat-group accent">
+                            <span className="label">PUNTOS GENERAL</span>
+                            <span className="value">{totalGen}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="team-detail-grid">
-                    {/* Last Match Encounter - Now with Soccer Pitch - COLLAPSIBLE */}
-                    <div className="detail-section lineup-pitch-section full-width">
-                        <div
-                            className="section-header-flex clickable"
-                            onClick={() => setIsLineupExpanded(!isLineupExpanded)}
-                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                        >
-                            <h4><User size={18} /> Última Alineación (J{lastRoundNum})</h4>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                <div className="lineup-score-box">
-                                    Puntos Jornada: <span className="score-val">{lastScore}</span>
-                                </div>
-                                {isLineupExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                <div className="team-detail-scroll-area">
+                    {/* 1. RESUMEN LIGA & RACHA (TOP - NON-COLLAPSIBLE) */}
+                    <div className="detail-grid-two-cols">
+                        <div className="detail-section-static">
+                            <div className="section-static-header">
+                                <Trophy size={18} />
+                                <span>Resumen de Liga</span>
+                            </div>
+                            <div className="static-content-inner stats-grid-mini">
+                                <div className="stat-row"><span>1ª Vuelta (Excel)</span> <strong>{fullStats.hist_pts || 0} pts</strong></div>
+                                <div className="stat-row"><span>2ª Vuelta (API)</span> <strong>{fullStats.points || 0} pts</strong></div>
+                                <div className="stat-row"><span>Partidos Jugados</span> <strong>{fullStats.played || 0}</strong></div>
+                                <div className="stat-row"><span>V - E - D</span> <strong>{fullStats.won || 0}-{fullStats.drawn || 0}-{fullStats.lost || 0}</strong></div>
                             </div>
                         </div>
 
-                        {isLineupExpanded && (
-                            <div className="compact-pitch-container">
-                                {lastLineup && lastLineup.length > 0 ? (
-                                    <SoccerPitch players={lastLineup} compact={true} />
-                                ) : (
-                                    <div className="no-data-notice">
-                                        <Loader2 className="animate-spin" size={20} />
-                                        <p>Cargando alineación táctica...</p>
-                                    </div>
-                                )}
+                        <div className="detail-section-static">
+                            <div className="section-static-header">
+                                <Activity size={18} />
+                                <span>Racha Actual</span>
+                            </div>
+                            <div className="static-content-inner form-container-v2">
+                                <div className="form-shields-row">
+                                    {last5Matches.map((m, i) => (
+                                        <div key={i} className="form-shield-item">
+                                            <img src={getTeamShield(m.opponentName)} alt={m.opponentName} className="history-shield" />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="form-results-row">
+                                    {last5Matches.map((m, i) => (
+                                        <div key={i} className={`form-symbol-v2 result-${m.result}`}>
+                                            {m.result}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. ULTIMA ALINEACION (COLLAPSIBLE) */}
+                    <div className="detail-section-collapsible">
+                        <div className="section-trigger" onClick={() => toggleSection('lineup')}>
+                            <div className="label-with-icon">
+                                <User size={18} />
+                                <span>Alineación Última Jornada (J{lastRoundNum})</span>
+                            </div>
+                            <div className="trigger-right">
+                                {expandedSections.lineup ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </div>
+                        </div>
+                        {expandedSections.lineup && (
+                            <div className="section-content-inner animate-slide-down">
+                                <div className="pitch-wrapper-mini">
+                                    {lastLineup && lastLineup.length > 0 ? (
+                                        <SoccerPitch players={lastLineup} compact={true} />
+                                    ) : (
+                                        <div className="no-data-notice" style={{ minHeight: '300px', display: 'flex', alignItems: 'center' }}>
+                                            <Loader2 className="animate-spin" size={20} />
+                                            <p>Cargando alineación táctica...</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Left Column: Stats & Sanctions */}
-                    <div className="detail-col">
-                        <div className="detail-section stats-summary mb-1">
-                            <h4><ShieldAlert size={18} /> Resumen de Liga</h4>
-                            <div className="stats-grid">
-                                <div className="stat-item"><span>1ª Vuelta (Excel)</span> <strong>{fullStats.hist_pts} pts</strong></div>
-                                <div className="stat-item"><span>2ª Vuelta (API)</span> <strong>{fullStats.points} pts</strong></div>
-                                <div className="stat-item"><span>Partidos Jugados</span> <strong>{fullStats.played}</strong></div>
-                                <div className="stat-item"><span>V - E - D</span> <strong className="record">{fullStats.won} - {fullStats.drawn} - {fullStats.lost}</strong></div>
-                            </div>
-                        </div>
-
-                        <div className="detail-section sanctions-infractions">
-                            <h4><AlertTriangle size={18} /> Disciplina</h4>
-                            <div className="sub-section">
-                                <h5>Sanciones Activas</h5>
-                                {activeSanctions.length > 0 ? activeSanctions.map((s, i) => {
-                                    const isActive = s.noCaptUntil >= currentRoundNum;
-                                    return (
-                                        <div key={i} className={`active-sanction-tag ${!isActive ? 'completed' : ''}`}>
-                                            <strong>{s.player}</strong>: Fuera hasta J{s.outTeamUntil}, No cap. hasta J{s.noCaptUntil}
-                                        </div>
-                                    );
-                                }) : <p className="empty-text">Sin sanciones activas</p>}
-
-                            </div>
-
-                            <div className="sub-section mt-2">
-                                <h5>Infracciones ({infractions.reduce((acc, i) => acc + (i.cost || 0), 0)}€)</h5>
-                                <div className="scroll-y inf-mini-scroll">
-                                    {infractions.length > 0 ? infractions.map((inf, i) => (
-                                        <div key={i} className="inf-mini-item">
-                                            <span>J{inf.round} - {inf.type}</span>
-                                            <span className="inf-cost">{inf.cost}€</span>
-                                        </div>
-                                    )) : <p className="empty-text">Sin infracciones</p>}
+                    {/* 3. PROXIMO RIVAL (COLLAPSIBLE) */}
+                    {nextMatchData && (
+                        <div className="detail-section-collapsible">
+                            <div className="section-trigger" onClick={() => toggleSection('nextOpponent')}>
+                                <div className="label-with-icon">
+                                    <Activity size={18} />
+                                    <span>Próximo Rival</span>
+                                    <div className="rival-trigger-badge">
+                                        <img src={getTeamShield(nextMatchData.opponentName)} alt="" className="micro-shield" />
+                                        <span>J{nextMatchData.roundNum}</span>
+                                    </div>
+                                </div>
+                                <div className="trigger-right">
+                                    {expandedSections.nextOpponent ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column: Captains - COLLAPSIBLE */}
-                    <div className="detail-col">
-                        <div className="detail-section captain-history h-100">
-                            <div
-                                className="section-header-flex clickable"
-                                onClick={() => setIsCaptainHistoryExpanded(!isCaptainHistoryExpanded)}
-                                style={{ cursor: 'pointer', userSelect: 'none', marginBottom: isCaptainHistoryExpanded ? '1rem' : '0' }}
-                            >
-                                <h4><History size={18} /> Historial de Capitanes</h4>
-                                {isCaptainHistoryExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                            </div>
-
-                            {isCaptainHistoryExpanded && (
-                                <div className="scroll-y history-list-tall">
-                                    {(stats.captainHistory || []).slice().reverse().map((h, i) => (
-                                        <div key={i} className={`history-item-new ${h.alert ? 'alert' : ''}`}>
-                                            <div className="hist-round">J{h.round}</div>
-                                            <div className="hist-name">{h.player}</div>
-                                            <div className="hist-count">x{h.count}</div>
+                            {expandedSections.nextOpponent && (
+                                <div className="section-content-inner animate-slide-down">
+                                    <div className="opponent-detail-box">
+                                        <div className="opponent-info-header">
+                                            <img src={getTeamShield(nextMatchData.opponentName)} alt="" className="med-shield" />
+                                            <div className="opp-meta">
+                                                <h4>{nextMatchData.opponentName}</h4>
+                                                <p>Última alineación utilizada</p>
+                                            </div>
                                         </div>
-                                    ))}
-                                    {(!stats.captainHistory || stats.captainHistory.length === 0) && <p className="empty-text">Sin historial registrado.</p>}
+                                        <div className="pitch-wrapper-mini opp-pitch">
+                                            {nextMatchData.opponentStats?.lastMatchData?.lineup ? (
+                                                <SoccerPitch players={nextMatchData.opponentStats.lastMatchData.lineup} compact={true} />
+                                            ) : (
+                                                <p className="no-data-text">Cargando alineación del rival...</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 4. DISCIPLINA & HISTORIAL CAPITANES (SIDE BY SIDE COLLAPSIBLE) */}
+                    <div className="detail-grid-two-cols">
+                        <div className="detail-section-collapsible">
+                            <div className="section-trigger" onClick={() => toggleSection('discipline')}>
+                                <div className="label-with-icon">
+                                    <AlertTriangle size={18} />
+                                    <span>Disciplina</span>
+                                </div>
+                                {expandedSections.discipline ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </div>
+                            {expandedSections.discipline && (
+                                <div className="section-content-inner sanctions-list-mini">
+                                    <div className="sub-header-mini">Sanciones Activas</div>
+                                    {activeSanctions.length > 0 ? activeSanctions.map((s, i) => (
+                                        <div key={i} className="sanction-tag">
+                                            <strong>{s.player}</strong>: Fuera hasta J{s.outTeamUntil}
+                                        </div>
+                                    )) : <p className="empty-text">Sin sanciones activas</p>}
+
+                                    <div className="sub-header-mini mt-2">Infracciones</div>
+                                    <div className="inf-scroll-box">
+                                        {infractions.length > 0 ? infractions.map((inf, i) => (
+                                            <div key={i} className="inf-mini-line">
+                                                <span>J{inf.round} - {inf.type}</span>
+                                                <span className="cost">{inf.cost}€</span>
+                                            </div>
+                                        )) : <p className="empty-text">Sin infracciones.</p>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="detail-section-collapsible">
+                            <div className="section-trigger" onClick={() => toggleSection('captains')}>
+                                <div className="label-with-icon">
+                                    <History size={18} />
+                                    <span>Capitanes</span>
+                                </div>
+                                {expandedSections.captains ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </div>
+                            {expandedSections.captains && (
+                                <div className="section-content-inner captains-history-box">
+                                    <div className="captains-list-scroll">
+                                        {(stats.captainHistory || []).slice().reverse().map((h, i) => (
+                                            <div key={i} className={`cap-history-row ${h.alert ? 'alert' : ''}`}>
+                                                <span className="round">J{h.round}</span>
+                                                <span className="name">{h.player}</span>
+                                                <span className="count">x{h.count}</span>
+                                            </div>
+                                        ))}
+                                        {(!stats.captainHistory || stats.captainHistory.length === 0) && <p className="empty-text">Sin historial.</p>}
+                                    </div>
                                 </div>
                             )}
                         </div>

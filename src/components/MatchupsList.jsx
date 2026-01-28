@@ -16,8 +16,34 @@ const item = {
     show: { opacity: 1, y: 0 }
 };
 
-function MatchupsList({ matches, onMatchClick, isLiveRound }) {
+function MatchupsList({ matches, onMatchClick, isLiveRound, roundStatus }) {
     if (!matches || matches.length === 0) {
+        // Special message for historical rounds
+        if (roundStatus === 'historical') {
+            return (
+                <div style={{ padding: '3rem 2rem', textAlign: 'center' }}>
+                    <div style={{
+                        background: 'rgba(251, 191, 36, 0.1)',
+                        border: '1px solid rgba(251, 191, 36, 0.3)',
+                        borderRadius: 'var(--radius-lg)',
+                        padding: '2rem',
+                        maxWidth: '500px',
+                        margin: '0 auto'
+                    }}>
+                        <h3 style={{ color: '#fbbf24', marginBottom: '0.5rem', fontSize: '1.2rem' }}>
+                            📋 Primera Vuelta
+                        </h3>
+                        <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem' }}>
+                            PRIMERA VUELTA PENDIENTE DE CARGAR
+                        </p>
+                        <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginTop: '0.5rem', opacity: 0.7 }}>
+                            Los datos de las jornadas 1-19 se añadirán próximamente
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.5 }}>
                 <p>No hay enfrentamientos disponibles.</p>
@@ -38,15 +64,37 @@ function MatchupsList({ matches, onMatchClick, isLiveRound }) {
                 const isEnriched = m.enriched;
                 const showLiveBadge = isLiveRound && isEnriched;
 
-                const homeScore = m.homeScore !== undefined ? m.homeScore : '-';
-                const awayScore = m.awayScore !== undefined ? m.awayScore : '-';
+                // Determine scores based on round status
+                let homeScore, awayScore;
+                if (roundStatus === 'future') {
+                    homeScore = 0;
+                    awayScore = 0;
+                } else if (roundStatus === 'past') {
+                    homeScore = m.homeScore !== undefined ? m.homeScore : 0;
+                    awayScore = m.awayScore !== undefined ? m.awayScore : 0;
+                } else if (roundStatus === 'current') {
+                    homeScore = m.homeScore !== undefined ? m.homeScore : '-';
+                    awayScore = m.awayScore !== undefined ? m.awayScore : '-';
+                } else {
+                    homeScore = m.homeScore !== undefined ? m.homeScore : '-';
+                    awayScore = m.awayScore !== undefined ? m.awayScore : '-';
+                }
 
-                // Determine winner for highlighting
-                const homeWon = isEnriched && m.homeScore > m.awayScore;
-                const awayWon = isEnriched && m.awayScore > m.homeScore;
+                // Determine winner for highlighting (only for past/current with scores)
+                const homeWon = (roundStatus === 'past' || (roundStatus === 'current' && isEnriched)) &&
+                    m.homeScore > m.awayScore;
+                const awayWon = (roundStatus === 'past' || (roundStatus === 'current' && isEnriched)) &&
+                    m.awayScore > m.homeScore;
 
-                // Match Status (Simplified logic)
-                const isFinished = isEnriched; // Assuming enriched means calculate/finished roughly
+                // Match Status
+                let matchStatus = 'Pendiente';
+                if (roundStatus === 'past') {
+                    matchStatus = 'Final';
+                } else if (roundStatus === 'current') {
+                    matchStatus = showLiveBadge ? 'En Juego' : (isEnriched ? 'Final' : 'Pendiente');
+                } else if (roundStatus === 'future') {
+                    matchStatus = 'Próximo';
+                }
 
                 return (
                     <motion.div
@@ -85,15 +133,15 @@ function MatchupsList({ matches, onMatchClick, isLiveRound }) {
                             <div className="score-block">
                                 <div className={`score-display ${showLiveBadge ? 'score-live' : ''}`}>
                                     <span className={homeWon ? 'winner-glow' : ''}>
-                                        {(isLiveRound && !isEnriched) ? '-' : homeScore}
+                                        {homeScore}
                                     </span>
                                     <span className="score-divider">:</span>
                                     <span className={awayWon ? 'winner-glow' : ''}>
-                                        {(isLiveRound && !isEnriched) ? '-' : awayScore}
+                                        {awayScore}
                                     </span>
                                 </div>
                                 <div className="match-status">
-                                    {isFinished ? 'Final' : (showLiveBadge ? 'En Juego' : 'Pendiente')}
+                                    {matchStatus}
                                 </div>
                             </div>
 

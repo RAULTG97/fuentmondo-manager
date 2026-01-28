@@ -56,6 +56,9 @@ export const getInternalLineup = (championshipId, userteamId, roundId) =>
 export const getInternalCup = (championshipId) =>
     internalPost('/5/cup/get', { championshipId });
 
+export const getInternalRankingMatches = (championshipId) =>
+    internalPost('/5/ranking/matches', { championshipId });
+
 // External methods
 export const getChampionships = () => Promise.resolve({
     data: CONFIG.CHAMPIONSHIPS

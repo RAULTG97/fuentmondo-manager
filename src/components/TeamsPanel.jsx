@@ -4,16 +4,6 @@ import { getTeamShield } from '../utils/assets';
 import { useTournament } from '../context/TournamentContext';
 import './TeamsPanel.css';
 
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.04
-        }
-    }
-};
-
 const itemVariants = {
     hidden: { opacity: 0, y: 15 },
     visible: {
@@ -26,33 +16,6 @@ const itemVariants = {
 const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
     const { championship, cupData } = useTournament();
 
-    const renderTeamCard = React.useCallback((teamName, teamObj = null, idx) => (
-        <motion.div
-            key={teamObj?.id || `${teamName}-${idx}`}
-            variants={itemVariants}
-            className={`team-card ${teamObj ? 'clickable' : ''}`}
-            onClick={() => teamObj && onTeamClick(teamObj)}
-            whileHover={{
-                scale: 1.02,
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'var(--primary)'
-            }}
-            whileTap={{ scale: 0.98 }}
-        >
-            <div className="team-shield-container">
-                <img
-                    src={getTeamShield(teamName)}
-                    alt={teamName}
-                    className="team-card-shield"
-                    loading="lazy"
-                    onError={(e) => { e.target.style.opacity = '0'; }}
-                />
-            </div>
-            <div className="team-card-info">
-                <h3 className="team-card-name">{teamName}</h3>
-            </div>
-        </motion.div>
-    ), [onTeamClick]);
 
     const participantsList = React.useMemo(() => {
         if (championship?.type === 'copa' && cupData?.rounds) {
@@ -79,12 +42,12 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
         return (
             <motion.div
                 className="teams-grid-container"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
             >
                 <motion.h3
-                    variants={itemVariants}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
                     style={{
                         color: 'var(--accent)',
                         marginBottom: '2rem',
@@ -97,7 +60,32 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
                     Participantes Copa Piraña
                 </motion.h3>
                 <div className="teams-grid">
-                    {participantsList.map((name, idx) => renderTeamCard(name, null, idx))}
+                    {participantsList.map((name, idx) => (
+                        <motion.div
+                            key={idx}
+                            variants={itemVariants}
+                            initial="hidden"
+                            animate="visible"
+                            className="team-card"
+                            whileHover={{
+                                scale: 1.02,
+                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                borderColor: 'var(--primary)'
+                            }}
+                        >
+                            <div className="team-shield-container">
+                                <img
+                                    src={getTeamShield(name)}
+                                    alt={name}
+                                    className="team-card-shield"
+                                    loading="lazy"
+                                />
+                            </div>
+                            <div className="team-card-info">
+                                <h3 className="team-card-name">{name}</h3>
+                            </div>
+                        </motion.div>
+                    ))}
                 </div>
             </motion.div>
         );
@@ -106,12 +94,40 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
     return (
         <motion.div
             className="teams-grid-container"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            key={sortedTeamsList.length}
         >
             <div className="teams-grid">
-                {sortedTeamsList.map((team, idx) => renderTeamCard(team.name, team, idx))}
+                {sortedTeamsList.map((team, idx) => (
+                    <motion.div
+                        key={team.id || idx}
+                        variants={itemVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className={`team-card ${team ? 'clickable' : ''}`}
+                        onClick={() => team && onTeamClick(team)}
+                        whileHover={{
+                            scale: 1.02,
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            borderColor: 'var(--primary)'
+                        }}
+                        whileTap={{ scale: 0.98 }}
+                    >
+                        <div className="team-shield-container">
+                            <img
+                                src={getTeamShield(team.name)}
+                                alt={team.name}
+                                className="team-card-shield"
+                                loading="lazy"
+                                onError={(e) => { e.target.style.opacity = '0'; }}
+                            />
+                        </div>
+                        <div className="team-card-info">
+                            <h3 className="team-card-name">{team.name}</h3>
+                        </div>
+                    </motion.div>
+                ))}
             </div>
         </motion.div>
     );

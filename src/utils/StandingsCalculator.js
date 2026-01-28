@@ -35,9 +35,16 @@ export function calculateH2HStandings(roundsData) {
 
             if (!team1 || !team2) return;
 
-            updateTeamStats(stats, team1, score1, score2, historicalMap);
-            updateTeamStats(stats, team2, score2, score1, historicalMap);
+            updateTeamStats(stats, team1, score1, score2, historicalMap, round.number, team2.name);
+            updateTeamStats(stats, team2, score2, score1, historicalMap, round.number, team1.name);
         });
+    });
+
+    // Final processing for each team
+    Object.values(stats).forEach(s => {
+        if (s.matchHistory) {
+            s.matchHistory.sort((a, b) => b.round - a.round);
+        }
     });
 
     // Sort: Total Points (Current + Hist) > Total General (Current + Hist)
@@ -56,7 +63,7 @@ export function calculateH2HStandings(roundsData) {
 /**
  * Helper to update or initialize team statistics
  */
-function updateTeamStats(stats, team, gf, ga, historicalMap) {
+function updateTeamStats(stats, team, gf, ga, historicalMap, roundNum, opponentName) {
     const id = team._id;
 
     if (!stats[id]) {
@@ -72,7 +79,8 @@ function updateTeamStats(stats, team, gf, ga, historicalMap) {
             gf: 0,
             ga: 0,
             hist_pts: hist.pts_totales,
-            hist_gen: hist.pts_generales
+            hist_gen: hist.pts_generales,
+            matchHistory: []
         };
     }
 
@@ -81,13 +89,23 @@ function updateTeamStats(stats, team, gf, ga, historicalMap) {
     s.gf += gf;
     s.ga += ga;
 
+    let result = '';
     if (gf > ga) {
         s.won++;
         s.points += 3;
+        result = 'V';
     } else if (gf < ga) {
         s.lost++;
+        result = 'D';
     } else {
         s.drawn++;
         s.points += 1;
+        result = 'E';
     }
+
+    s.matchHistory.push({
+        round: roundNum,
+        opponentName,
+        result
+    });
 }

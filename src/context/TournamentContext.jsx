@@ -9,6 +9,12 @@ export const TournamentProvider = ({ children }) => {
     const [ranking, setRanking] = useState([]);
     const [matches, setMatches] = useState([]);
 
+    // Full calendar data from /5/ranking/matches
+    const [fullCalendar, setFullCalendar] = useState(null);
+    const [currentRoundNumber, setCurrentRoundNumber] = useState(null);
+    const [calendarData, setCalendarData] = useState(null); // Complete calendar with teams and rounds
+    const [allRounds, setAllRounds] = useState([]); // All 38 rounds with status
+
     // Calculated global data
     const [h2hStandings, setH2HStandings] = useState([]);
     const [sanctionsData, setSanctionsData] = useState({});
@@ -31,6 +37,10 @@ export const TournamentProvider = ({ children }) => {
         selectedRoundId, setSelectedRoundId,
         ranking, setRanking,
         matches, setMatches,
+        fullCalendar, setFullCalendar,
+        currentRoundNumber, setCurrentRoundNumber,
+        calendarData, setCalendarData,
+        allRounds, setAllRounds,
         h2hStandings, setH2HStandings,
         sanctionsData, setSanctionsData,
         cupData, setCupData,

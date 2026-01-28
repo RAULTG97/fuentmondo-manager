@@ -15,6 +15,7 @@ import { useTournamentData } from '../hooks/useTournamentData';
 
 import PremiumDropdown from './common/PremiumDropdown';
 import Sidebar from './Sidebar';
+import RoundNavigator from './RoundNavigator';
 import MatchupsList from './MatchupsList';
 import SanctionsPanel from './SanctionsPanel';
 import InfractionsPanel from './InfractionsPanel';
@@ -39,6 +40,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     const {
         setChampionship, rounds, selectedRoundId, setSelectedRoundId,
         matches, h2hStandings, sanctionsData, cupData,
+        allRounds, currentRoundNumber,
         loadingDisplay, loadingStandings, loadingAllLineups, loadingCup,
         calculationProgress
     } = useTournament();
@@ -65,14 +67,48 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     // Handle data fetching side effects
     useTournamentData(activeTab);
 
-    const activeRoundNum = rounds.find(r => r._id === selectedRoundId)?.number || 0;
+    const currentRoundObj = rounds.find(r => {
+        if (typeof selectedRoundId === 'number') return r.number === selectedRoundId;
+        return r._id === selectedRoundId;
+    });
+    const activeRoundNum = currentRoundObj?.number || 0;
+    const selectedRound = currentRoundObj;
+    const actualRoundIdForAPI = currentRoundObj?._id || selectedRoundId;
+    const isHistoricalRound = (championship?.type !== 'copa' && typeof selectedRoundId === 'number' && selectedRoundId < 20) || selectedRound?.isHistorical || false;
 
     const renderMainContent = () => {
         if (loadingDisplay && activeTab === 'matchups') return <CardSkeleton count={6} />;
 
         switch (activeTab) {
             case 'matchups':
-                return <MatchupsList matches={matches} onMatchClick={setSelectedMatch} isLiveRound={selectedRoundId === activeRoundNum} />;
+                // For league championships, use allRounds data
+                if (championship?.type !== 'copa' && allRounds.length > 0) {
+                    const currentRound = allRounds.find(r => r.number == selectedRoundId) ||
+                        allRounds.find(r => r.number == currentRoundNumber);
+
+                    if (currentRound) {
+                        return (
+                            <>
+                                <RoundNavigator
+                                    currentRound={currentRound.number}
+                                    totalRounds={38}
+                                    onRoundChange={(newRound) => setSelectedRoundId(newRound)}
+                                    roundStatus={currentRound.status}
+                                    onReturnToCurrent={currentRoundNumber && currentRound.number != currentRoundNumber ? () => setSelectedRoundId(currentRoundNumber) : null}
+                                />
+                                <MatchupsList
+                                    matches={currentRound.matches}
+                                    onMatchClick={setSelectedMatch}
+                                    isLiveRound={currentRound.status === 'current'}
+                                    roundStatus={currentRound.status}
+                                />
+                            </>
+                        );
+                    }
+                }
+                // Fallback to old behavior for Copa or when allRounds not ready
+                const roundStatus = isHistoricalRound ? 'historical' : 'current';
+                return <MatchupsList matches={matches} onMatchClick={setSelectedMatch} isLiveRound={selectedRoundId === activeRoundNum} roundStatus={roundStatus} />;
             case 'standings':
                 if (loadingStandings) return <TableSkeleton rows={10} columns={12} />;
                 return (
@@ -238,15 +274,25 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                             className="championship-main"
                         />
 
-                        {rounds.length > 0 && (activeTab === 'matchups' || activeTab === 'standings') && (
+                        {(rounds.length > 0 || allRounds.length > 0) && activeTab === 'matchups' && (
                             <PremiumDropdown
                                 label="Jornada"
                                 value={selectedRoundId}
-                                options={rounds.map(r => ({ id: r._id, label: `Jornada ${r.number}` }))}
+                                options={(championship?.type === 'copa' ? rounds : allRounds).map(r => ({
+                                    id: championship?.type === 'copa' ? r._id : r.number,
+                                    label: `Jornada ${r.number}`
+                                }))}
                                 onChange={setSelectedRoundId}
                                 icon={Calendar}
                                 className="round-secondary"
-                                displayValue={selectedRoundId ? `Jornada ${rounds.find(r => r._id === selectedRoundId)?.number}` : 'Seleccionar'}
+                                displayValue={(() => {
+                                    const rList = championship?.type === 'copa' ? rounds : allRounds;
+                                    const r = rList.find(r => {
+                                        if (typeof selectedRoundId === 'number') return r.number === selectedRoundId;
+                                        return r._id === selectedRoundId;
+                                    });
+                                    return r ? `Jornada ${r.number}` : (typeof selectedRoundId === 'number' ? `Jornada ${selectedRoundId}` : 'Seleccionar');
+                                })()}
                             />
                         )}
                     </div>
@@ -283,7 +329,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                     <MatchDetail
                         match={selectedMatch}
                         championshipId={championship._id}
-                        roundId={selectedRoundId}
+                        roundId={actualRoundIdForAPI}
                         onClose={() => setSelectedMatch(null)}
                     />
                 )}
@@ -293,7 +339,9 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                         h2hStandings={h2hStandings}
                         sanctionsData={sanctionsData}
                         rounds={rounds}
-                        selectedRoundId={selectedRoundId}
+                        allRounds={allRounds}
+                        selectedRoundId={actualRoundIdForAPI}
+                        currentRoundNumber={currentRoundNumber}
                         onClose={() => setSelectedDetailTeam(null)}
                     />
                 )}

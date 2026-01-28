@@ -148,12 +148,12 @@ const SanctionCard = memo(({ s, currentRound, isExpanded, onToggle, isHistorical
 });
 
 const SanctionedCaptainsPanel = () => {
-    const { sanctionsData, selectedRoundId, rounds } = useTournament();
+    const { sanctionsData, currentRoundNumber, rounds } = useTournament();
     const [filter, setFilter] = useState('current'); // 'current' | 'historical'
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedCard, setExpandedCard] = useState(null);
 
-    const currentRound = useMemo(() => rounds.find(r => r._id === selectedRoundId)?.number || 0, [rounds, selectedRoundId]);
+    const currentRound = currentRoundNumber || 0;
     const allSanctions = sanctionsData.activeSanctions || [];
 
     const filteredTotal = useMemo(() => {

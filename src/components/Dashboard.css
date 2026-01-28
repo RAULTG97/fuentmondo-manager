@@ -13,7 +13,6 @@
     flex-direction: column;
     gap: 2.5rem;
     min-height: 100vh;
-    animation: fade-in 0.8s var(--transition-smooth);
 }
 
 .dashboard-header {
