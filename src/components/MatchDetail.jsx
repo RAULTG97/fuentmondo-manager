@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Shirt, Crown } from 'lucide-react';
+import { X, Shirt, Crown, Laugh } from 'lucide-react';
 import { getInternalLineup } from '../services/api';
 import SoccerPitch from './SoccerPitch';
+import MatchShareCard from './MatchShareCard';
 import { getTeamShield } from '../utils/assets';
 import Confetti from './Confetti';
 import './MatchDetail.css';
@@ -11,6 +12,7 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
     const [lineupAway, setLineupAway] = useState(null);
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    const [showShare, setShowShare] = useState(false);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -69,9 +71,14 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
                 {/* Header */}
                 <div className="match-detail-header">
                     <h3>Detalle del Enfrentamiento</h3>
-                    <button onClick={onClose} className="close-btn-red">
-                        <X size={20} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={() => setShowShare(true)} className="share-btn-action-troll" title="Generar Humillación">
+                            <Laugh size={22} />
+                        </button>
+                        <button onClick={onClose} className="close-btn-red">
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Scoreboard - Sticky */}
@@ -129,6 +136,19 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
                         </div>
                     )}
                 </div>
+
+                {showShare && (
+                    <MatchShareCard
+                        match={{
+                            homeTeam: match.homeName,
+                            awayTeam: match.awayName,
+                            homeScore: homePoints,
+                            awayScore: awayPoints,
+                            roundName: match.roundName
+                        }}
+                        onClose={() => setShowShare(false)}
+                    />
+                )}
             </div>
         </div>
     );
