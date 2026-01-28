@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
     Swords, Table, Trophy, Users, AlertOctagon,
-    Ban, LayoutGrid, ChevronLeft, ChevronRight, Menu, Award
+    Ban, LayoutGrid, ChevronLeft, ChevronRight, Menu, Award, Calendar
 } from 'lucide-react';
 import { APP_LOGO } from '../utils/assets';
 import './Sidebar.css';
@@ -9,6 +9,7 @@ import './Sidebar.css';
 const navItems = [
     { id: 'matchups', label: 'Enfrentamientos', icon: Swords, mode: 'league' },
     { id: 'standings', label: 'Clasificación', icon: Table, mode: 'league' },
+    { id: 'calendar', label: 'Calendario', icon: Calendar, mode: 'league' },
     { id: 'copa', label: 'Copa Piraña', icon: Trophy, mode: 'cup' },
     { id: 'teams', label: 'Equipos', icon: LayoutGrid },
     { id: 'captains', label: 'Capitanes', icon: Trophy },

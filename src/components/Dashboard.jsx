@@ -24,6 +24,7 @@ import CaptainsPanel from './CaptainsPanel';
 import SanctionedCaptainsPanel from './SanctionedCaptainsPanel';
 import TeamDetailModal from './TeamDetailModal';
 import CopaPanel from './CopaPanel';
+import CalendarPanel from './CalendarPanel';
 import LineupViewer from './LineupViewer';
 import MatchDetail from './MatchDetail';
 import HallOfFame from './HallOfFame';
@@ -219,6 +220,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 return <SanctionedCaptainsPanel />;
             case 'copa':
                 return <CopaPanel cupData={cupData} loading={loadingCup} championship={championship} />;
+            case 'calendar':
+                return <CalendarPanel allRounds={allRounds} h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} />;
             case 'hall_of_fame':
                 return <HallOfFame />;
             default: return null;

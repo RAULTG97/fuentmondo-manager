@@ -1,0 +1,192 @@
+.calendar-panel {
+    width: 100%;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.calendar-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.calendar-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: auto;
+}
+
+.calendar-table th,
+.calendar-table td {
+    padding: 0.75rem;
+    text-align: center;
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.calendar-table th {
+    background: rgba(15, 23, 42, 0.8) !important;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.calendar-table .sticky-col-team {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #0f172a !important;
+    min-width: 80px;
+    width: 80px;
+    border-right: 2px solid var(--primary);
+}
+
+.team-cell-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.team-cell-content:hover {
+    transform: scale(1.1);
+}
+
+.team-shield-large {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.calendar-cell {
+    min-width: 65px;
+    vertical-align: middle;
+}
+
+.cell-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.opp-shield-micro {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: grayscale(0.5);
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+tr:hover .opp-shield-micro {
+    filter: grayscale(0);
+    opacity: 1;
+}
+
+.result-overlay {
+    position: absolute;
+    bottom: -10px;
+    right: -2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 900;
+    color: white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.result-V {
+    background: #10b981;
+}
+
+.result-E {
+    background: #f59e0b;
+}
+
+.result-D {
+    background: #ef4444;
+}
+
+/* Scrollbar styling */
+.calendar-table-wrapper::-webkit-scrollbar {
+    height: 8px;
+}
+
+.calendar-table-wrapper::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.calendar-table-wrapper::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 4px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+
+    .calendar-table th,
+    .calendar-table td {
+        padding: 0.5rem;
+    }
+
+    .team-shield-large {
+        width: 36px;
+        height: 36px;
+    }
+
+    .opp-shield-micro {
+        width: 24px;
+        height: 24px;
+    }
+
+    .calendar-table .sticky-col-team {
+        min-width: 60px;
+        width: 60px;
+    }
+
+    .calendar-cell {
+        min-width: 45px;
+    }
+
+    .result-overlay {
+        width: 14px;
+        height: 14px;
+        font-size: 0.55rem;
+        bottom: -6px;
+        right: -1px;
+    }
+}
