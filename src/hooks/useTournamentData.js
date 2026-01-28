@@ -11,6 +11,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 export const useTournamentData = (activeTab) => {
     const context = useTournament();
     const isFetching = useRef(false);
+    const allRoundsRef = useRef([]);
 
     const {
         championship,
@@ -226,6 +227,7 @@ export const useTournamentData = (activeTab) => {
 
                 setCurrentRoundNumber(currentJornada);
                 setAllRounds(all38Rounds);
+                allRoundsRef.current = all38Rounds;
 
                 // For leagues, if we don't have a selectedRoundId yet, set it to currentJornada
                 if (currentJornada && !selectedRoundId) {
@@ -242,104 +244,7 @@ export const useTournamentData = (activeTab) => {
         return () => { isMounted = false; };
     }, [championship, rounds.length]);
 
-    // 2. Fetch Ranking & Matches for Selected Round
-    useEffect(() => {
-        if (!selectedRoundId || !championship) return;
-
-        let isMounted = true;
-        const loadRoundDetail = async () => {
-            // Handle historical rounds for leagues
-            if (championship.type !== 'copa' && typeof selectedRoundId === 'number' && selectedRoundId < 20) {
-                setMatches([]);
-                setRanking([]);
-                setLoadingDisplay(false);
-                return;
-            }
-
-            setLoadingDisplay(true);
-            try {
-                // Determine API round ID
-                let apiRoundId = selectedRoundId;
-
-                // If it's a league and selectedRoundId is a number (jornada)
-                if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
-                    // We need to find the REAL round ID from the rounds list if it exists
-                    const roundObj = rounds.find(r => r.number === selectedRoundId);
-                    // However, getLeagueMatches might not have the ID we need if it's from the other API
-                    // Let's try to use the selectedRoundId as is, but if it's >= 20, 
-                    // we might need to map it if the API requires something else.
-
-                    // IF we have allRounds, we can use the matches from there immediately
-                    if (allRounds.length > 0) {
-                        const currentRound = allRounds.find(r => r.number === selectedRoundId);
-                        if (currentRound && currentRound.matches) {
-                            setMatches(currentRound.matches);
-                        }
-                    }
-                }
-
-                // If apiRoundId is still a number for a league >= 20, we need the actual MongoDB ID
-                // to call getInternalRankingRound correctly (for ranking/standings)
-                let actualIdForAPI = apiRoundId;
-                if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
-                    // Try to find the original ID from championship data if available
-                    // or just skip if we only care about matches which we already set above.
-                    // For now, let's try to call the API to get the ranking
-                    const originalRound = rounds.find(r => r.number === selectedRoundId);
-                    if (originalRound && typeof originalRound._id === 'string') {
-                        actualIdForAPI = originalRound._id;
-                    }
-                }
-
-                if (actualIdForAPI === null) {
-                    setLoadingDisplay(false);
-                    return;
-                }
-
-                const data = await fetchWithRetry(getInternalRankingRound, championship._id, actualIdForAPI);
-                if (!isMounted || !data) return;
-
-                const rankList = data.ranking || [];
-                setRanking(rankList);
-
-                if (data.matches) {
-                    const indexToName = {};
-                    const indexToRealId = {};
-                    rankList.forEach((t, idx) => {
-                        indexToName[idx + 1] = t.name;
-                        indexToRealId[idx + 1] = t._id;
-                    });
-
-                    const processed = data.matches.map(m => {
-                        const pIds = m.p || [];
-                        const scores = m.m || [0, 0];
-                        return {
-                            ...m,
-                            p: pIds,
-                            homeName: indexToName[pIds[0]] || "Unknown",
-                            awayName: indexToName[pIds[1]] || "Unknown",
-                            homeTeamId: indexToRealId[pIds[0]],
-                            awayTeamId: indexToRealId[pIds[1]],
-                            homeScore: scores[0],
-                            awayScore: scores[1],
-                            enriched: false
-                        };
-                    });
-                    setMatches(processed);
-                    enrichCurrentMatches(processed, championship._id, actualIdForAPI);
-                }
-            } catch (err) {
-                console.error("[ERROR] Round data failed:", err);
-            } finally {
-                if (isMounted) setLoadingDisplay(false);
-            }
-        };
-
-        loadRoundDetail();
-        return () => { isMounted = false; };
-    }, [selectedRoundId, championship, rounds, allRounds]);
-
-    const enrichCurrentMatches = async (initialMatches, champId, rId) => {
+    const enrichCurrentMatches = useCallback(async (initialMatches, champId, rId, roundNumber) => {
         let currentMatches = [...initialMatches];
         const extractPts = (d) => {
             if (!d) return 0;
@@ -371,9 +276,137 @@ export const useTournamentData = (activeTab) => {
                     console.warn(`[ENRICH FAIL] Match ${m.homeName} vs ${m.awayName}:`, e.message);
                 }
             }));
-            setMatches([...currentMatches]);
+
+            const updated = [...currentMatches];
+            setMatches(updated);
+
+            // Sincronizar con allRounds para que se vea en el Dashboard de ligas
+            if (championship?.type !== 'copa' && roundNumber) {
+                setAllRounds(prev => {
+                    const next = prev.map(r =>
+                        r.number === roundNumber ? { ...r, matches: updated } : r
+                    );
+                    allRoundsRef.current = next;
+                    return next;
+                });
+            }
         }
-    };
+    }, [setMatches, setAllRounds, championship]);
+
+    // 2. Fetch Ranking & Matches for Selected Round
+    const loadRoundDetail = useCallback(async (isAutoRefresh = false) => {
+        if (!selectedRoundId || !championship) return;
+
+        // Handle historical rounds for leagues
+        if (championship.type !== 'copa' && typeof selectedRoundId === 'number' && selectedRoundId < 20) {
+            setMatches([]);
+            setRanking([]);
+            if (!isAutoRefresh) setLoadingDisplay(false);
+            return;
+        }
+
+        if (!isAutoRefresh) setLoadingDisplay(true);
+        try {
+            // Determine API round ID
+            let apiRoundId = selectedRoundId;
+
+            if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
+                const currentRound = allRoundsRef.current.find(r => r.number === selectedRoundId);
+                if (currentRound && currentRound.matches) {
+                    setMatches(currentRound.matches);
+                }
+            }
+
+            let actualIdForAPI = apiRoundId;
+            if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
+                const originalRound = rounds.find(r => r.number === selectedRoundId);
+                if (originalRound && typeof originalRound._id === 'string') {
+                    actualIdForAPI = originalRound._id;
+                }
+            }
+
+            if (actualIdForAPI === null) {
+                if (!isAutoRefresh) setLoadingDisplay(false);
+                return;
+            }
+
+            const data = await fetchWithRetry(getInternalRankingRound, championship._id, actualIdForAPI);
+            if (!data) return;
+
+            const rankList = data.ranking || [];
+            setRanking(rankList);
+
+            if (data.matches) {
+                const indexToName = {};
+                const indexToRealId = {};
+                rankList.forEach((t, idx) => {
+                    indexToName[idx + 1] = t.name;
+                    indexToRealId[idx + 1] = t._id;
+                });
+
+                const processed = data.matches.map(m => {
+                    const pIds = m.p || [];
+                    const scores = m.m || [0, 0];
+                    return {
+                        ...m,
+                        p: pIds,
+                        homeName: indexToName[pIds[0]] || "Unknown",
+                        awayName: indexToName[pIds[1]] || "Unknown",
+                        homeTeamId: indexToRealId[pIds[0]],
+                        awayTeamId: indexToRealId[pIds[1]],
+                        homeScore: scores[0],
+                        awayScore: scores[1],
+                        enriched: false
+                    };
+                });
+
+                setMatches(processed);
+
+                // Sincronizar con allRounds
+                if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
+                    setAllRounds(prev => {
+                        const next = prev.map(r =>
+                            r.number === selectedRoundId ? { ...r, matches: processed } : r
+                        );
+                        allRoundsRef.current = next;
+                        return next;
+                    });
+                }
+
+                enrichCurrentMatches(processed, championship._id, actualIdForAPI, typeof selectedRoundId === 'number' ? selectedRoundId : null);
+            }
+        } catch (err) {
+            console.error("[ERROR] Round data failed:", err);
+        } finally {
+            if (!isAutoRefresh) setLoadingDisplay(false);
+        }
+    }, [selectedRoundId, championship, rounds, enrichCurrentMatches, setMatches, setRanking, setLoadingDisplay, setAllRounds]);
+
+    useEffect(() => {
+        loadRoundDetail();
+    }, [loadRoundDetail]);
+
+    // 2b. Polling for Live Data
+    useEffect(() => {
+        if (!selectedRoundId || !championship) return;
+
+        // Solo polleamos en vistas donde los puntos en vivo son críticos
+        const isLiveView = ['matchups', 'dashboard', 'standings', 'calendar'].includes(activeTab);
+        if (!isLiveView) return;
+
+        // Determinar si la jornada seleccionada es la actual o futura (potencialmente en vivo)
+        const roundObj = rounds.find(r => r.number === selectedRoundId || r._id === selectedRoundId);
+        const isPast = roundObj?.status === 'past' || roundObj?.status === 'historical';
+
+        // Si es una jornada pasada muy antigua, quizás no necesite polling, 
+        // pero por simplicidad polleamos si el usuario está en el Dashboard
+        const intervalId = setInterval(() => {
+            console.log(`[POLLING] Refrescando datos en vivo de la jornada ${selectedRoundId}...`);
+            loadRoundDetail(true); // true = autoRefresh (sin loader)
+        }, 15000); // 15 segundos
+
+        return () => clearInterval(intervalId);
+    }, [selectedRoundId, championship, activeTab, loadRoundDetail, rounds]);
 
     // 3. Tournament Wide Calculation
     const calculateTournamentWideData = useCallback(async () => {
