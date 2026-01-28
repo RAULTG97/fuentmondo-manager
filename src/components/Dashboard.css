@@ -252,26 +252,19 @@
 
     .global-col {
         display: table-cell !important;
-        width: 50px !important;
-        min-width: 50px !important;
+        width: 60px !important;
+        min-width: 60px !important;
         text-align: center;
     }
 
-    /* Make Global columns (Total and Gen) sticky on mobile */
+    /* Make Global column (Total) sticky on mobile */
     .standings-view th:nth-child(3),
     .standings-view td:nth-child(3) {
         position: sticky !important;
-        left: 140px !important;
+        left: 170px !important;
         z-index: 19 !important;
         background: #0f172a !important;
-    }
-
-    .standings-view th:nth-child(4),
-    .standings-view td:nth-child(4) {
-        position: sticky !important;
-        left: 190px !important;
-        z-index: 19 !important;
-        background: #0f172a !important;
+        border-right: 1px solid var(--glass-border) !important;
     }
 
     .clickable-header.collapsed {
@@ -293,9 +286,17 @@
     display: none;
 }
 
+.show-mobile-table-cell {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .show-mobile-inline {
         display: inline;
+    }
+
+    .show-mobile-table-cell {
+        display: table-cell !important;
     }
 
     .hide-mobile {
@@ -365,8 +366,8 @@
     .standings-view th:nth-child(2),
     .standings-view td:nth-child(2) {
         left: 40px !important;
-        min-width: 100px !important;
-        max-width: 100px !important;
+        min-width: 130px !important;
+        max-width: 130px !important;
     }
 }
 
