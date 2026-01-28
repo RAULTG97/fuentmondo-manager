@@ -88,7 +88,9 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                         onClick={() => setExpandedVuelta(expandedVuelta === 1 ? null : 1)}
                                         style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center', cursor: 'pointer' }}
                                     >
-                                        1ª Vuelta {expandedVuelta === 1 ? '▾' : '▸'}
+                                        <span className="hide-mobile">{expandedVuelta === 1 ? '1ª Vuelta' : '1ª V'}</span>
+                                        <span className="show-mobile-inline">{expandedVuelta === 1 ? '1ªV' : '1ªV'}</span>
+                                        {expandedVuelta === 1 ? ' ▾' : ' ▸'}
                                     </th>
                                     <th
                                         colSpan={expandedVuelta === 2 ? 6 : 1}
@@ -96,13 +98,15 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                         onClick={() => setExpandedVuelta(expandedVuelta === 2 ? null : 2)}
                                         style={{ background: 'rgba(168, 85, 247, 0.05)', textAlign: 'center', cursor: 'pointer' }}
                                     >
-                                        2ª Vuelta {expandedVuelta === 2 ? '▾' : '▸'}
+                                        <span className="hide-mobile">{expandedVuelta === 2 ? '2ª Vuelta' : '2ª V'}</span>
+                                        <span className="show-mobile-inline">{expandedVuelta === 2 ? '2ªV' : '2ªV'}</span>
+                                        {expandedVuelta === 2 ? ' ▾' : ' ▸'}
                                     </th>
                                 </tr>
                                 <tr className="table-header-sub">
                                     <th>Pos</th><th>Equipo</th>
-                                    <th style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
-                                    <th style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
+                                    <th className="global-col" style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
+                                    <th className="global-col" style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
 
                                     {/* 1st Leg Columns */}
                                     <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Pts</th>
@@ -142,13 +146,13 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                             </div>
                                         </td>
                                         {/* Global Scores First */}
-                                        <td style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
-                                        <td style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
+                                        <td className="global-col" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
+                                        <td className="global-col" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
 
                                         {/* 1st Leg Data */}
                                         <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
                                         <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_gen}</td>
-                                        {expandedVuelta !== 1 && <td className="summary-col" style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{team.hist_pts}</td>}
+                                        {expandedVuelta !== 1 && <td className="summary-col hide-mobile-strict" style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{team.hist_pts}</td>}
 
                                         {/* 2nd Leg Data */}
                                         <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.points}</td>
@@ -157,7 +161,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                         <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.drawn}</td>
                                         <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--error)' }}>{team.lost}</td>
                                         <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.gf}</td>
-                                        {expandedVuelta !== 2 && <td className="summary-col" style={{ opacity: 0.6 }}>{team.points}</td>}
+                                        {expandedVuelta !== 2 && <td className="summary-col hide-mobile-strict" style={{ opacity: 0.6 }}>{team.points}</td>}
                                     </tr>
                                 ))}
                             </tbody>

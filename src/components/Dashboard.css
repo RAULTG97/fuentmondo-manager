@@ -125,7 +125,12 @@
 
 @media (max-width: 768px) {
     .table-header-main {
-        display: none !important;
+        display: table-row !important;
+    }
+
+    .table-header-main th {
+        font-size: 0.65rem !important;
+        padding: 0.4rem 0.2rem !important;
     }
 }
 
@@ -241,12 +246,42 @@
     }
 
     .standings-view td {
-        padding: 0.6rem 0.4rem !important;
+        padding: 0.6rem 0.3rem !important;
         font-size: 0.75rem !important;
     }
 
+    .global-col {
+        display: table-cell !important;
+        width: 50px !important;
+        text-align: center;
+    }
+
+    .clickable-header.collapsed {
+        width: 50px !important;
+        min-width: 50px !important;
+    }
+
     .summary-col {
-        width: 45px !important;
+        width: 35px !important;
+        font-size: 0.7rem !important;
+    }
+
+    .hide-mobile-strict {
+        display: none !important;
+    }
+}
+
+.show-mobile-inline {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .show-mobile-inline {
+        display: inline;
+    }
+
+    .hide-mobile {
+        display: none !important;
     }
 }
 
