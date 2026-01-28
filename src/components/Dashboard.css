@@ -236,13 +236,14 @@
 
     .standings-view th:nth-child(2),
     .standings-view td:nth-child(2) {
-        min-width: 120px !important;
-        left: 45px !important;
+        min-width: 100px !important;
+        left: 40px !important;
+        max-width: 100px;
     }
 
     .standings-view th:nth-child(1),
     .standings-view td:nth-child(1) {
-        min-width: 45px !important;
+        min-width: 40px !important;
     }
 
     .standings-view td {
@@ -324,6 +325,14 @@
     text-align: center;
 }
 
+@media (max-width: 768px) {
+
+    .standings-view th:nth-child(1),
+    .standings-view td:nth-child(1) {
+        min-width: 40px !important;
+    }
+}
+
 .standings-view th:nth-child(2),
 .standings-view td:nth-child(2) {
     position: sticky;
@@ -331,7 +340,17 @@
     z-index: 20;
     background: #0f172a;
     border-right: 2px solid rgba(59, 130, 246, 0.3);
-    min-width: 220px;
+    min-width: 180px;
+}
+
+@media (max-width: 768px) {
+
+    .standings-view th:nth-child(2),
+    .standings-view td:nth-child(2) {
+        left: 40px !important;
+        min-width: 100px !important;
+        max-width: 100px !important;
+    }
 }
 
 /* Header special z-index */
