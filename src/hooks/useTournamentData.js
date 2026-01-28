@@ -189,9 +189,9 @@ export const useTournamentData = (activeTab) => {
                                 const pIds = m.p || [];
                                 const scores = m.m || [0, 0];
 
-                                // In this API, pIds are indices into the ranking array
-                                const homeTeam = data.ranking?.[pIds[0] - 1];
-                                const awayTeam = data.ranking?.[pIds[1] - 1];
+                                // In this API, pIds are indices into the teams array
+                                const homeTeam = data.teams?.[pIds[0] - 1];
+                                const awayTeam = data.teams?.[pIds[1] - 1];
 
                                 return {
                                     ...m,
