@@ -425,7 +425,7 @@ export const useTournamentData = (activeTab) => {
             });
 
             // Fetch missing lineups for sanctions logic
-            const needsSanctionsData = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'standings'].includes(activeTab);
+            const needsSanctionsData = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'standings', 'calendar'].includes(activeTab);
             if (needsSanctionsData) {
                 const sCalc = await import('../utils/SanctionsCalculator');
                 const allTeamsMap = new Map();
