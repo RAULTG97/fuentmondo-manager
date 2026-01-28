@@ -254,7 +254,25 @@
     .global-col {
         display: table-cell !important;
         width: 50px !important;
+        min-width: 50px !important;
         text-align: center;
+    }
+
+    /* Make Global columns (Total and Gen) sticky on mobile */
+    .standings-view th:nth-child(3),
+    .standings-view td:nth-child(3) {
+        position: sticky !important;
+        left: 140px !important;
+        z-index: 19 !important;
+        background: #0f172a !important;
+    }
+
+    .standings-view th:nth-child(4),
+    .standings-view td:nth-child(4) {
+        position: sticky !important;
+        left: 190px !important;
+        z-index: 19 !important;
+        background: #0f172a !important;
     }
 
     .clickable-header.collapsed {
