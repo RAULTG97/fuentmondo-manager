@@ -515,7 +515,7 @@ export const useTournamentData = (activeTab) => {
     }, [championship, rounds, selectedRoundId, currentRoundNumber, ranking, matches, activeTab]);
 
     useEffect(() => {
-        const needsCalc = ['standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams'].includes(activeTab);
+        const needsCalc = ['standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams', 'calendar'].includes(activeTab);
         if (needsCalc && rounds.length > 0) calculateTournamentWideData();
     }, [activeTab, calculateTournamentWideData, rounds]);
 

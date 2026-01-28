@@ -55,7 +55,12 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick }) => {
     }, [h2hStandings, calendarRounds]);
 
     if (!h2hStandings || h2hStandings.length === 0) {
-        return <div className="no-data-notice">No hay datos de equipos disponibles.</div>;
+        return (
+            <div className="no-data-notice" style={{ padding: '4rem', textAlign: 'center' }}>
+                <p>Cargando datos de equipos y jornadas...</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.5, marginTop: '1rem' }}>Si el problema persiste, intenta abrir la pestaña de Clasificación primero.</p>
+            </div>
+        );
     }
 
     return (
