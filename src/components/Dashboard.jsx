@@ -50,6 +50,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [selectedUserTeam, setSelectedUserTeam] = useState(null);
     const [selectedMatch, setSelectedMatch] = useState(null);
+    const [selectedMatchRoundId, setSelectedMatchRoundId] = useState(null);
     const [selectedDetailTeam, setSelectedDetailTeam] = useState(null);
     const [expandedVuelta, setExpandedVuelta] = useState(null); // null | 1 | 2
 
@@ -76,6 +77,16 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     const selectedRound = currentRoundObj;
     const actualRoundIdForAPI = currentRoundObj?._id || selectedRoundId;
     const isHistoricalRound = (championship?.type !== 'copa' && typeof selectedRoundId === 'number' && selectedRoundId < 20) || selectedRound?.isHistorical || false;
+
+    const handleMatchClick = (match, roundId = null) => {
+        setSelectedMatch(match);
+        setSelectedMatchRoundId(roundId);
+    };
+
+    const closeMatchDetail = () => {
+        setSelectedMatch(null);
+        setSelectedMatchRoundId(null);
+    };
 
     const renderMainContent = () => {
         if (loadingDisplay && activeTab === 'matchups') return <CardSkeleton count={6} />;
@@ -221,7 +232,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
             case 'copa':
                 return <CopaPanel cupData={cupData} loading={loadingCup} championship={championship} />;
             case 'calendar':
-                return <CalendarPanel allRounds={allRounds} h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} onMatchClick={setSelectedMatch} />;
+                return <CalendarPanel allRounds={allRounds} h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} onMatchClick={handleMatchClick} />;
             case 'hall_of_fame':
                 return <HallOfFame />;
             default: return null;
@@ -333,8 +344,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                     <MatchDetail
                         match={selectedMatch}
                         championshipId={championship._id}
-                        roundId={actualRoundIdForAPI}
-                        onClose={() => setSelectedMatch(null)}
+                        roundId={selectedMatchRoundId || actualRoundIdForAPI}
+                        onClose={closeMatchDetail}
                     />
                 )}
                 {selectedDetailTeam && (

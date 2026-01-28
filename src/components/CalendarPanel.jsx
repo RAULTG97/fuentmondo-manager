@@ -47,7 +47,8 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick, onMatchClick }) =
                         result,
                         matchId: match.id,
                         status: round.status,
-                        fullMatch: match
+                        fullMatch: match,
+                        roundId: round._id
                     };
                 }
             });
@@ -98,7 +99,7 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick, onMatchClick }) =
                                         <td
                                             key={r.number}
                                             className={`calendar-cell ${match.fullMatch ? 'clickable' : ''}`}
-                                            onClick={() => match.fullMatch && onMatchClick(match.fullMatch)}
+                                            onClick={() => match.fullMatch && onMatchClick(match.fullMatch, match.roundId)}
                                         >
                                             <div className="cell-content">
                                                 <img

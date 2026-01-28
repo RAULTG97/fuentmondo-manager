@@ -162,6 +162,10 @@ export const useTournamentData = (activeTab) => {
                     let status = 'future';
                     let matchesData = null;
 
+                    // Link to real round ID from rounds state
+                    const roundObj = rounds.find(r => r.number === jornada);
+                    const roundId = roundObj?._id;
+
                     if (jornada <= 19) {
                         status = 'historical';
                     } else {
@@ -184,13 +188,15 @@ export const useTournamentData = (activeTab) => {
                             matchesData = apiRoundData.map(m => {
                                 const pIds = m.p || [];
                                 const scores = m.m || [0, 0];
-                                const homeTeam = teams[pIds[0] - 1];
-                                const awayTeam = teams[pIds[1] - 1];
+
+                                // In this API, pIds are indices into the ranking array
+                                const homeTeam = data.ranking?.[pIds[0] - 1];
+                                const awayTeam = data.ranking?.[pIds[1] - 1];
 
                                 return {
                                     ...m,
-                                    homeName: homeTeam?.name || "Unknown",
-                                    awayName: awayTeam?.name || "Unknown",
+                                    homeName: homeTeam?.name || homeTeam?.n || "Unknown",
+                                    awayName: awayTeam?.name || awayTeam?.n || "Unknown",
                                     homeTeamId: homeTeam?._id,
                                     awayTeamId: awayTeam?._id,
                                     homeScore: scores[0] || 0,
@@ -202,6 +208,7 @@ export const useTournamentData = (activeTab) => {
                     }
 
                     all38Rounds.push({
+                        _id: roundId,
                         number: jornada,
                         status,
                         matches: matchesData
@@ -229,9 +236,11 @@ export const useTournamentData = (activeTab) => {
             }
         };
 
-        loadCalendar();
+        if (championship && championship.type !== 'copa' && rounds.length > 0) {
+            loadCalendar();
+        }
         return () => { isMounted = false; };
-    }, [championship]);
+    }, [championship, rounds.length]);
 
     // 2. Fetch Ranking & Matches for Selected Round
     useEffect(() => {
@@ -461,12 +470,14 @@ export const useTournamentData = (activeTab) => {
                         const batch = rd.matches.slice(i, i + batchSizeLineups);
                         await Promise.all(batch.map(async (m) => {
                             if (!m.lineupA) {
-                                const tA = rd.ranking[m.p[0] - 1];
-                                if (tA) { m.lineupA = await getLineupSafe(tA._id); anyNew = true; }
+                                const tA = rd.ranking?.[m.p?.[0] - 1];
+                                if (tA) { m.lineupA = await getLineupSafe(tA._id, rd._id); anyNew = true; }
+                                else if (m.homeTeamId) { m.lineupA = await getLineupSafe(m.homeTeamId, rd._id); anyNew = true; }
                             }
                             if (!m.lineupB) {
-                                const tB = rd.ranking[m.p[1] - 1];
-                                if (tB) { m.lineupB = await getLineupSafe(tB._id); anyNew = true; }
+                                const tB = rd.ranking?.[m.p?.[1] - 1];
+                                if (tB) { m.lineupB = await getLineupSafe(tB._id, rd._id); anyNew = true; }
+                                else if (m.awayTeamId) { m.lineupB = await getLineupSafe(m.awayTeamId, rd._id); anyNew = true; }
                             }
                         }));
                     }
