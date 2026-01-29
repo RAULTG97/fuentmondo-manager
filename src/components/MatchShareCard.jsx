@@ -5,31 +5,36 @@ import { getTeamShield } from '../utils/assets';
 import './MatchShareCard.css';
 
 const BANTER_MESSAGES = [
-    "¡Vaya paliza, paquete! Das pena.",
-    "A pastar al campo, que es lo tuyo.",
-    "¿Has probado el Parchís? El fútbol no es para ti.",
-    "Ni con 12 ganas esto, eres lamentable.",
-    "Búscate otro hobby, la humillación te persigue.",
-    "¿Esto es tu equipo o un chiste de mal gusto?",
-    "Vende a todos y empieza de cero, inútil.",
-    "Lágrimas de perdedor... ¡deliciosas! Llora más.",
-    "Dime qué se siente al ser la vergüenza de la liga.",
-    "Tu abuela con tacones defiende mejor que tus troncos.",
-    "Menudo baño te han pegado, no te levantas en un mes.",
-    "¿Te devuelvo el dinero de la inscripción? Pobre diablo.",
-    "Hoy duermes en el suelo, por infame.",
-    "Eres el hazmerreír de todo el grupo.",
-    "¡GAME OVER, pringao de manual!",
-    "Basta ya de dar asco en el campo.",
-    "Te han borrado la dignidad del mapa.",
-    "¡ESTÁS ACABADO! Retírate con algo de orgullo.",
-    "A fregar la liga, que aquí no pintas nada.",
-    "Lo tuyo es de juzgado de guardia.",
-    "¿Ibas de favorito? ¡Vuelve a tu cueva!",
-    "Ni comprando al árbitro te salvas del humilladero.",
-    "Hoy no cenas, por haber sido tan humillado.",
-    "¡Vaya manta estás hecho! Un poco de respeto al balón.",
-    "Tu cara es el poema de la derrota absoluta."
+    "¡Vaya paliza, paquete! ¿Te has limpiado ya el culo?",
+    "A pastar al campo, que das puto asco.",
+    "¿Has probado el Parchís? Porque al fútbol eres un moñigo.",
+    "Ni con 12 ganas esto, eres el hazmerreír de tu casa.",
+    "Búscate otro hobby, la humillación es tu estado natural.",
+    "¿Esto es tu equipo o una puta guardería de cojos?",
+    "Vende a todos y retírate, me das vergüenza ajena.",
+    "Lágrimas de perdedor... ¡deliciosas! Trágate mi éxito.",
+    "Dime qué se siente al ser la puta zorra de la liga.",
+    "Tu abuela con tacones tiene más huevos que tus defensas.",
+    "Menudo baño de mierda te han pegado, ni con lejía te sale.",
+    "¿Te devuelvo el dinero de la inscripción? Pobretón infame.",
+    "Hoy duermes en el suelo como el perro que eres tras este baño.",
+    "Eres el bufón oficial de Fuentmondo.",
+    "¡GAME OVER, pringao de los cojones!",
+    "Basta ya de dar sida visual en el campo.",
+    "Te han borrado la dignidad, búscatela en el vertedero.",
+    "¡ESTÁS ACABADO! Vete a jugar a las canicas, inútil.",
+    "A fregar la liga, que aquí solo pintas el ridículo.",
+    "Lo tuyo es para que te quiten el carnet de presidente.",
+    "¿Ibas de gallito? ¡A la cazuela por bocas!",
+    "Ni comprando al VAR te salvas de este humilladero.",
+    "Hoy no cenas, te alimentas de mi desprecio.",
+    "¡Vaya puta mierda de equipo! Un respeto al balón, cabrón.",
+    "Tu cara de gilipollas derrotado es mi nuevo fondo de pantalla.",
+    "¿Dónde está tu equipo? Yo solo veo conos y payasos.",
+    "Te han puesto el culo como la bandera de Japón.",
+    "Eres el saco de boxeo preferido de la comunidad.",
+    "¡HUMILLADO! Si tuviera dignidad me moriría ahora mismo de asco.",
+    "Vete a llorar a la llorería, paquete integral."
 ];
 
 const SCENES = [
@@ -40,7 +45,10 @@ const SCENES = [
     'clown',        // Loser with clown nose/wig
     'trash',        // Loser in a trash can
     'baby',         // Loser as a baby crying
-    'toilet'        // Loser being "flushed"
+    'toilet',       // Loser being "flushed"
+    'kneel',        // Loser kneeling before winner
+    'jail',         // Loser behind bars
+    'pig'           // Loser as a pig
 ];
 
 const MatchShareCard = ({ match, onClose }) => {
@@ -104,7 +112,11 @@ const MatchShareCard = ({ match, onClose }) => {
                 <div className="pres-head-container">
                     {type === 'winner' && <div className="winner-crown">👑</div>}
                     <div className="pres-head">
-                        {type === 'winner' ? '😆' : (scene === 'clown' && type === 'loser' ? '🤡' : (scene === 'baby' ? '👶' : '😭'))}
+                        <div className="pres-hair"></div>
+                        {type === 'winner' ? '😆' :
+                            (scene === 'clown' && type === 'loser' ? '🤡' :
+                                (scene === 'baby' && type === 'loser' ? '👶' :
+                                    (scene === 'pig' && type === 'loser' ? '🐷' : '😭')))}
                     </div>
                 </div>
 
@@ -117,7 +129,7 @@ const MatchShareCard = ({ match, onClose }) => {
                     <div className="label-on-shirt">{teamName.substring(0, 10)}</div>
                 </div>
 
-                {scene !== 'toilet' && scene !== 'trash' && (
+                {scene !== 'toilet' && scene !== 'trash' && scene !== 'pig' && (
                     <div className="pres-legs">
                         <div className="leg" style={{ backgroundColor: color }}></div>
                         <div className="leg" style={{ backgroundColor: color }}></div>
@@ -160,6 +172,7 @@ const MatchShareCard = ({ match, onClose }) => {
                                         {scene === 'trash' && <div className="trash-can">🗑️</div>}
                                         {scene === 'toilet' && <div className="toilet-bowl">🚽</div>}
                                         {scene === 'burial' && <div className="coffin">⚰️</div>}
+                                        {scene === 'jail' && <div className="jail-bars">⛓️</div>}
 
                                         <div className="action-ribbon">
                                             {scene === 'throne' && "EL REY DE LOS PAQUETES"}
@@ -170,6 +183,9 @@ const MatchShareCard = ({ match, onClose }) => {
                                             {scene === 'baby' && "A BUSCAR EL CHUPETE"}
                                             {scene === 'toilet' && "UN RESULTADO DE MIERDA"}
                                             {scene === 'shame' && "HUMILLADO EN PÚBLICO"}
+                                            {scene === 'kneel' && "ARRODÍLLATE ANTE TU PADRE"}
+                                            {scene === 'jail' && "A LA CÁRCEL DE MALOS"}
+                                            {scene === 'pig' && "ERES UN CERDO JUGANDO"}
                                         </div>
                                     </>
                                 )}
