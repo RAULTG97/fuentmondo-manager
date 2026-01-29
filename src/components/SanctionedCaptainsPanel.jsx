@@ -1,9 +1,10 @@
 import React, { useState, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, History, AlertCircle, Search, Ban, Timer, X } from 'lucide-react';
+import { ShieldAlert, History, AlertCircle, Search, Ban, Timer, X, FileDown } from 'lucide-react';
 import { useTournament } from '../context/TournamentContext';
 import { getTeamShield } from '../utils/assets';
 import EmptyState from './common/EmptyState';
+import { exportSanctionsToPDF } from '../utils/pdfExport';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -268,6 +269,40 @@ const SanctionedCaptainsPanel = () => {
                             <History size={16} /> Histórico ({historicalSanctions.length})
                         </button>
                     </div>
+
+                    <button
+                        onClick={() => exportSanctionsToPDF(currentSanctions, currentRound)}
+                        disabled={currentSanctions.length === 0}
+                        style={{
+                            background: currentSanctions.length === 0 ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981, #059669)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: currentSanctions.length === 0 ? 'var(--text-dim)' : 'white',
+                            padding: '0.75rem 1.5rem',
+                            borderRadius: 'var(--radius-sm)',
+                            cursor: currentSanctions.length === 0 ? 'not-allowed' : 'pointer',
+                            fontSize: 'var(--font-sm)',
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.6rem',
+                            transition: 'all 0.2s',
+                            boxShadow: currentSanctions.length === 0 ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)',
+                            opacity: currentSanctions.length === 0 ? 0.5 : 1
+                        }}
+                        onMouseEnter={(e) => {
+                            if (currentSanctions.length > 0) {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = currentSanctions.length === 0 ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)';
+                        }}
+                    >
+                        <FileDown size={18} />
+                        Exportar PDF
+                    </button>
                 </div>
             </div>
 
