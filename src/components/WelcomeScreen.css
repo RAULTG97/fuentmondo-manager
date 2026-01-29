@@ -287,26 +287,106 @@ img[src*="intro_Copa"] {
     }
 }
 
-/* Mobile Responsiveness */
 /* Mobile Responsiveness Improvements */
 @media (max-width: 768px) {
+    .welcome-content {
+        padding: 1.5rem 1rem;
+        justify-content: space-between;
+    }
+
     .competition-selector {
-        max-width: 360px;
-        gap: 0.5rem;
+        max-width: 100%;
+        gap: 0.75rem;
         flex: 1;
         justify-content: center;
         grid-template-columns: 1fr;
         padding: 0;
+        margin: 1rem 0;
     }
 
     .comp-card {
         flex-direction: row;
-        padding: 0.6rem 1rem;
-        gap: 1.25rem;
-        border-radius: 0.75rem;
-        height: min-content;
-        min-height: 70px;
+        padding: 1.25rem 1.25rem;
+        gap: 1.5rem;
+        border-radius: 1.25rem;
+        height: auto;
+        min-height: 85px;
         justify-content: flex-start;
+    }
+
+    .comp-logo-box {
+        width: 55px;
+        height: 55px;
+        flex: 0 0 55px;
+    }
+
+    .comp-info {
+        text-align: left;
+    }
+
+    .main-title {
+        font-size: 1.75rem;
+        margin-top: 0.5rem;
+    }
+
+    .logo-container {
+        width: 85px;
+        height: 85px;
+        margin-bottom: 0.5rem;
+        padding: 0.75rem;
+        border-radius: 20px;
+    }
+
+    .welcome-header {
+        margin-bottom: 0.5rem;
+        margin-top: 1vh;
+    }
+
+    .welcome-footer {
+        padding-top: 1rem;
+        margin-top: auto;
+        opacity: 0.4;
+        font-size: 0.75rem;
+        text-align: center;
+        width: 100%;
+    }
+}
+
+/* Specific Tweak for iPhone X (approx 812px height) */
+@media (max-height: 850px) and (max-width: 768px) {
+    .welcome-content {
+        padding: 2rem 1rem 1.5rem;
+    }
+
+    .comp-card {
+        min-height: clamp(75px, 11vh, 90px);
+    }
+}
+
+/* Ultra small height fix - SE and very small models */
+@media (max-height: 700px) and (max-width: 768px) {
+    .welcome-content {
+        padding: 1rem;
+    }
+
+    .welcome-header {
+        margin-bottom: 0.25rem;
+    }
+
+    .logo-container {
+        width: 65px;
+        height: 65px;
+        padding: 0.5rem;
+    }
+
+    .main-title {
+        font-size: 1.4rem;
+    }
+
+    .comp-card {
+        padding: 0.75rem 1rem;
+        min-height: 70px;
+        gap: 1rem;
     }
 
     .comp-logo-box {
@@ -315,66 +395,12 @@ img[src*="intro_Copa"] {
         flex: 0 0 45px;
     }
 
-    .comp-info {
-        text-align: left;
-    }
-
-    .main-title {
-        font-size: 1.4rem;
-    }
-
-    .logo-container {
-        width: 65px;
-        height: 65px;
-        margin-bottom: 0.25rem;
-        padding: 0.5rem;
-    }
-
-    .welcome-header {
-        margin-bottom: 0.25rem;
-    }
-}
-
-/* Extra small height fix - IMPORTANT FOR IPHONE X / SE */
-@media (max-height: 750px) {
-    .welcome-header {
-        margin-bottom: 0.1rem;
-    }
-
-    .logo-container {
-        width: 50px;
-        height: 50px;
-        padding: 0.5rem;
-        margin-bottom: 0.1rem;
-        border-radius: 15px;
-    }
-
-    .main-title {
-        font-size: 1.1rem;
-    }
-
-    .comp-card {
-        padding: 0.4rem 0.75rem;
-        min-height: 60px;
-        gap: 1rem;
-    }
-
-    .comp-logo-box {
-        width: 35px;
-        height: 35px;
-        flex: 0 0 35px;
-    }
-
     .comp-subtitle {
-        font-size: 0.8rem;
-    }
-
-    .comp-title {
-        font-size: 0.55rem;
+        font-size: 0.9rem;
     }
 
     .welcome-footer {
-        padding: 0.1rem;
-        font-size: 0.55rem;
+        padding-top: 0.5rem;
+        font-size: 0.65rem;
     }
 }
