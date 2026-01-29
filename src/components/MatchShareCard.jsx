@@ -5,26 +5,31 @@ import { getTeamShield } from '../utils/assets';
 import './MatchShareCard.css';
 
 const BANTER_MESSAGES = [
-    "¡Vaya paliza, paquete!",
-    "A pastar al campo...",
-    "¿Has probado el Parchís?",
-    "Ni con 12 ganas esto.",
-    "Búscate otro hobby.",
-    "Humillación nivel leyenda.",
-    "¿Esto es tu equipo o un chiste?",
-    "Vende a todos y empieza de cero.",
-    "Lágrimas de perdedor... ¡deliciosas!",
-    "Dime qué se siente al ser tan malo.",
-    "Tu abuela con tacones defiende mejor.",
-    "Menudo baño te han pegado.",
-    "¿Te devuelvo el dinero de la inscripción?",
-    "Hoy duermes en el sofá.",
-    "Eres el hazmerreír de la liga.",
-    "¡GAME OVER, pringao!",
-    "A fregar la liga...",
-    "Basta ya de hacer el ridículo.",
-    "Te han borrado del mapa.",
-    "¡ESTÁS ACABADO!"
+    "¡Vaya paliza, paquete! Das pena.",
+    "A pastar al campo, que es lo tuyo.",
+    "¿Has probado el Parchís? El fútbol no es para ti.",
+    "Ni con 12 ganas esto, eres lamentable.",
+    "Búscate otro hobby, la humillación te persigue.",
+    "¿Esto es tu equipo o un chiste de mal gusto?",
+    "Vende a todos y empieza de cero, inútil.",
+    "Lágrimas de perdedor... ¡deliciosas! Llora más.",
+    "Dime qué se siente al ser la vergüenza de la liga.",
+    "Tu abuela con tacones defiende mejor que tus troncos.",
+    "Menudo baño te han pegado, no te levantas en un mes.",
+    "¿Te devuelvo el dinero de la inscripción? Pobre diablo.",
+    "Hoy duermes en el suelo, por infame.",
+    "Eres el hazmerreír de todo el grupo.",
+    "¡GAME OVER, pringao de manual!",
+    "Basta ya de dar asco en el campo.",
+    "Te han borrado la dignidad del mapa.",
+    "¡ESTÁS ACABADO! Retírate con algo de orgullo.",
+    "A fregar la liga, que aquí no pintas nada.",
+    "Lo tuyo es de juzgado de guardia.",
+    "¿Ibas de favorito? ¡Vuelve a tu cueva!",
+    "Ni comprando al árbitro te salvas del humilladero.",
+    "Hoy no cenas, por haber sido tan humillado.",
+    "¡Vaya manta estás hecho! Un poco de respeto al balón.",
+    "Tu cara es el poema de la derrota absoluta."
 ];
 
 const SCENES = [
@@ -103,11 +108,13 @@ const MatchShareCard = ({ match, onClose }) => {
                     </div>
                 </div>
 
-                <div className="pres-body" style={{ flex: 1, backgroundColor: color }}>
-                    <div className="label-on-shirt">{teamName.substring(0, 10)}</div>
+                <div className="pres-neck"></div>
+
+                <div className="pres-body" style={{ backgroundColor: color }}>
                     <div className="pres-shield-container">
                         <img src={getTeamShield(teamName)} alt="" className="pres-shield-mini" />
                     </div>
+                    <div className="label-on-shirt">{teamName.substring(0, 10)}</div>
                 </div>
 
                 {scene !== 'toilet' && scene !== 'trash' && (
@@ -170,9 +177,9 @@ const MatchShareCard = ({ match, onClose }) => {
 
                             <div className="cromo-footer">
                                 <div className="cromo-score-row">
-                                    <span className="team-n">{match.homeTeam}</span>
+                                    <span className="team-n home">{match.homeTeam}</span>
                                     <span className="final-nums">{homeScore} - {awayScore}</span>
-                                    <span className="team-n">{match.awayTeam}</span>
+                                    <span className="team-n away">{match.awayTeam}</span>
                                 </div>
                                 <div className="troll-watermark">TROLL EDITION - NO APTO PARA SENSIBLES</div>
                             </div>

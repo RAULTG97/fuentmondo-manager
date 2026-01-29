@@ -73,7 +73,7 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
                     <h3>Detalle del Enfrentamiento</h3>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button onClick={() => setShowShare(true)} className="share-btn-action-troll" title="Generar Humillación">
-                            <Laugh size={22} />
+                            <Laugh size={34} />
                         </button>
                         <button onClick={onClose} className="close-btn-red">
                             <X size={20} />
