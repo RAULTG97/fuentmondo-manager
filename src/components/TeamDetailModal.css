@@ -35,8 +35,9 @@
     position: absolute;
     top: 1.25rem;
     right: 1.25rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #ef4444;
+    /* Red by default */
+    border: 1px solid #dc2626;
     color: white;
     width: 40px;
     height: 40px;
@@ -50,9 +51,10 @@
 }
 
 .close-btn:hover {
-    background: #ef4444;
-    border-color: #ef4444;
-    transform: rotate(90deg);
+    background: #dc2626;
+    /* Darker red on hover */
+    border-color: #b91c1c;
+    transform: rotate(90deg) scale(1.1);
 }
 
 /* COMPACT HEADER */
