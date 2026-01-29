@@ -299,7 +299,7 @@ export const useTournamentData = (activeTab) => {
                 });
             }
         }
-    }, [setMatches, setAllRounds, championship]);
+    }, [setMatches, setAllRounds, championship, currentRoundNumber]);
 
     // 2. Fetch Ranking & Matches for Selected Round
     const loadRoundDetail = useCallback(async (isAutoRefresh = false) => {
@@ -386,14 +386,30 @@ export const useTournamentData = (activeTab) => {
                     });
                 }
 
-                enrichCurrentMatches(processed, championship._id, actualIdForAPI, typeof selectedRoundId === 'number' ? selectedRoundId : null);
+                // Only enrich with lineup data if this is the current/live round
+                // For past rounds, we rely on cached data from allRounds or skip enrichment
+                const roundNumber = typeof selectedRoundId === 'number' ? selectedRoundId : null;
+                const isCurrentRound = roundNumber === currentRoundNumber;
+
+                if (isCurrentRound) {
+                    // Live round: fetch fresh lineup data with short TTL
+                    enrichCurrentMatches(processed, championship._id, actualIdForAPI, roundNumber);
+                } else {
+                    // Past/future round: check if we already have enriched data in allRounds
+                    const cachedRound = allRoundsRef.current.find(r => r.number === roundNumber);
+                    if (cachedRound?.matches?.some(m => m.enriched)) {
+                        // Use cached enriched data
+                        setMatches(cachedRound.matches);
+                    }
+                    // Otherwise, just use the basic scores from the ranking API (already set above)
+                }
             }
         } catch (err) {
             console.error("[ERROR] Round data failed:", err);
         } finally {
             if (!isAutoRefresh) setLoadingDisplay(false);
         }
-    }, [selectedRoundId, championship, rounds, enrichCurrentMatches, setMatches, setRanking, setLoadingDisplay, setAllRounds]);
+    }, [selectedRoundId, championship, rounds, enrichCurrentMatches, setMatches, setRanking, setLoadingDisplay, setAllRounds, currentRoundNumber]);
 
     useEffect(() => {
         loadRoundDetail();
