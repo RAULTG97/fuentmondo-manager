@@ -47,7 +47,8 @@
     justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
-    z-index: 20;
+    z-index: 50;
+    /* Higher than header's z-index: 30 */
 }
 
 .close-btn:hover {
