@@ -1,0 +1,315 @@
+.welcome-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #020617;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+}
+
+/* Background Animations */
+.bg-glow-1 {
+    position: absolute;
+    top: -10%;
+    left: -10%;
+    width: 60vw;
+    height: 60vw;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+    animation: pulse-glow 8s infinite alternate;
+    pointer-events: none;
+}
+
+.bg-glow-2 {
+    position: absolute;
+    bottom: -10%;
+    right: -10%;
+    width: 60vw;
+    height: 60vw;
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%);
+    animation: pulse-glow 10s infinite alternate-reverse;
+    pointer-events: none;
+}
+
+@keyframes pulse-glow {
+    from {
+        transform: scale(1) translate(0, 0);
+        opacity: 0.5;
+    }
+
+    to {
+        transform: scale(1.2) translate(5%, 5%);
+        opacity: 0.8;
+    }
+}
+
+.welcome-content {
+    width: 100%;
+    max-width: 1000px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Center the whole group */
+    position: relative;
+    z-index: 10;
+    height: 100dvh;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.welcome-header {
+    text-align: center;
+    margin-bottom: clamp(1.5rem, 4vh, 3rem);
+    animation: fade-down-in 1s cubic-bezier(0.23, 1, 0.32, 1);
+    flex-shrink: 0;
+}
+
+@keyframes fade-down-in {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.logo-container {
+    width: clamp(70px, 15vh, 120px);
+    height: clamp(70px, 15vh, 120px);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20%;
+    padding: 1rem;
+    margin: 0 auto 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+.main-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.main-title {
+    font-size: clamp(1.5rem, 5vw, 2.5rem);
+    font-weight: 950;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+/* Selector Grid */
+.competition-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 900px;
+    animation: fade-up-in 1s cubic-bezier(0.23, 1, 0.32, 1) 0.3s backwards;
+    flex-shrink: 1;
+}
+
+@keyframes fade-up-in {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.comp-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    border-radius: 1.5rem;
+    padding: clamp(1rem, 3vh, 2rem) 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.comp-logo-box {
+    width: clamp(60px, 12vh, 90px);
+    height: clamp(60px, 12vh, 90px);
+    background: white;
+    border-radius: 50%;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.comp-logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+    /* Works perfectly if the logo has a white background */
+}
+
+/* Specific fix for Copa and JPEG backgrounds */
+.comp-card[onClick*="copa"] .comp-logo-box img,
+img[src*="intro_Copa"] {
+    mix-blend-mode: lighten;
+    /* Inverts multiply logic for dark themes if the bg is black/dark, or use screen. If bg is white use multiply. */
+}
+
+.comp-logo-box img {
+    mix-blend-mode: multiply;
+    background: white;
+    /* Ensures colors in the drawing remain correct before multiply */
+}
+
+.comp-info {
+    text-align: center;
+    flex: 1;
+}
+
+.comp-title {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #60a5fa;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.15rem;
+}
+
+.comp-subtitle {
+    display: block;
+    font-size: clamp(0.9rem, 1.8vw, 1.1rem);
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+/* Hover Effects */
+.comp-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(96, 165, 250, 0.5);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.comp-card:hover .comp-logo-box {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+/* Exit Transition */
+.exit-active {
+    pointer-events: none;
+}
+
+.exit-active .welcome-content {
+    animation: landing-exit 0.8s cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+
+.exit-active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #020617;
+    animation: overlay-fade-in 0.8s forwards;
+}
+
+@keyframes landing-exit {
+    to {
+        opacity: 0;
+        transform: scale(1.1) translateY(-20px);
+        filter: blur(10px);
+    }
+}
+
+@keyframes overlay-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.welcome-footer {
+    margin-top: 4rem;
+    opacity: 0.4;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    animation: fade-in 2s;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 0.4;
+    }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .competition-selector {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        padding: 0 1rem;
+    }
+
+    .main-title {
+        font-size: 2.25rem;
+    }
+
+    .logo-container {
+        width: 120px;
+        height: 120px;
+    }
+
+    .comp-card {
+        flex-direction: row;
+        padding: 1.5rem;
+        gap: 1.5rem;
+        text-align: left;
+    }
+
+    .comp-info {
+        text-align: left;
+    }
+
+    .comp-logo-box {
+        width: 70px;
+        height: 70px;
+    }
+}

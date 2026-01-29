@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getChampionships } from './services/api';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
+import WelcomeScreen from './components/WelcomeScreen';
 import { TournamentProvider } from './context/TournamentContext';
 import './App.css';
 
@@ -15,12 +16,6 @@ function App() {
       .then(data => {
         const list = data.data || data.championships || [];
         setChampionships(list);
-        if (list.length > 0) {
-          const preferred = list.find(c => c.name.toUpperCase().includes("CHAMPIONS")) ||
-            list.find(c => c.name.toUpperCase().includes("COPA PIRAÑA")) ||
-            list[0];
-          setSelectedChampId(preferred._id);
-        }
         setLoading(false);
       })
       .catch(err => {
@@ -42,16 +37,17 @@ function App() {
   return (
     <TournamentProvider>
       <div className="app-root">
-        {selectedChamp ? (
+        {selectedChampId ? (
           <Dashboard
             championship={selectedChamp}
             championships={championships}
             onChampionshipChange={setSelectedChampId}
           />
         ) : (
-          <div className="flex-center" style={{ height: '100vh', color: 'white' }}>
-            <p>No se han encontrado torneos activos.</p>
-          </div>
+          <WelcomeScreen
+            championships={championships}
+            onSelect={setSelectedChampId}
+          />
         )}
       </div>
     </TournamentProvider>
