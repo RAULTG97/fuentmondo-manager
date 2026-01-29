@@ -133,7 +133,10 @@ export const useTournamentData = (activeTab) => {
         let isMounted = true;
         const loadCalendar = async () => {
             try {
-                const data = await fetchWithRetry(getInternalRankingMatches, championship._id);
+                // Determine if we need live data for calendar (usually yes, for scores)
+                // We'll trust the default short TTL (1 min) if we pass true, or intermediate (5 min) if false.
+                // Since this shows "current" round scores, better to be relatively fresh.
+                const data = await fetchWithRetry(getInternalRankingMatches, championship._id, true);
                 if (!isMounted || !data) return;
 
                 setCalendarData(data);
@@ -258,10 +261,15 @@ export const useTournamentData = (activeTab) => {
             await Promise.all(batch.map(async (m, idx) => {
                 const gIdx = i + idx;
                 if (!m.homeTeamId || !m.awayTeamId) return;
+
+                // Determine if this specific round is live for cache purposes
+                // If roundNumber matches currentRoundNumber, we treat it as live
+                const isRoundLive = roundNumber === currentRoundNumber;
+
                 try {
                     const [resH, resA] = await Promise.all([
-                        fetchWithRetry(getInternalLineup, champId, m.homeTeamId, rId),
-                        fetchWithRetry(getInternalLineup, champId, m.awayTeamId, rId)
+                        fetchWithRetry(getInternalLineup, champId, m.homeTeamId, rId, isRoundLive),
+                        fetchWithRetry(getInternalLineup, champId, m.awayTeamId, rId, isRoundLive)
                     ]);
                     const sH = extractPts(resH);
                     const sA = extractPts(resA);
@@ -330,7 +338,12 @@ export const useTournamentData = (activeTab) => {
                 return;
             }
 
-            const data = await fetchWithRetry(getInternalRankingRound, championship._id, actualIdForAPI);
+            // Verify if selected round is "live" (current or future-but-active)
+            const roundObj = rounds.find(r => r.number === selectedRoundId || r._id === selectedRoundId);
+            const isRoundLive = selectedRoundId === currentRoundNumber ||
+                (roundObj && roundObj.status === 'current');
+
+            const data = await fetchWithRetry(getInternalRankingRound, championship._id, actualIdForAPI, isRoundLive);
             if (!data) return;
 
             const rankList = data.ranking || [];
@@ -398,8 +411,9 @@ export const useTournamentData = (activeTab) => {
         const roundObj = rounds.find(r => r.number === selectedRoundId || r._id === selectedRoundId);
         const isPast = roundObj?.status === 'past' || roundObj?.status === 'historical';
 
-        // Si es una jornada pasada muy antigua, quizás no necesite polling, 
-        // pero por simplicidad polleamos si el usuario está en el Dashboard
+        // Si es una jornada pasada, no hacemos polling
+        if (isPast) return;
+
         const intervalId = setInterval(() => {
             console.log(`[POLLING] Refrescando datos en vivo de la jornada ${selectedRoundId}...`);
             loadRoundDetail(true); // true = autoRefresh (sin loader)
@@ -433,7 +447,8 @@ export const useTournamentData = (activeTab) => {
             const batchSizeFetch = 5;
             for (let i = 0; i < neededFetch.length; i += batchSizeFetch) {
                 const batch = neededFetch.slice(i, i + batchSizeFetch);
-                const results = await Promise.all(batch.map(r => getInternalRankingRound(championship._id, r._id).catch(() => null)));
+                // Historical data -> isLive = false
+                const results = await Promise.all(batch.map(r => getInternalRankingRound(championship._id, r._id, false).catch(() => null)));
                 results.forEach((data, idx) => {
                     if (data) {
                         const roundInfo = batch[idx];
@@ -510,7 +525,8 @@ export const useTournamentData = (activeTab) => {
                     let anyNew = false;
                     const getLineupSafe = async (tid) => {
                         try {
-                            const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id);
+                            // Historical lineups -> isLive = false
+                            const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id, false);
                             return (res?.players?.initial) ? res.players.initial : (res?.players || []);
                         } catch (e) { return []; }
                     };

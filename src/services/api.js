@@ -33,6 +33,8 @@ const internalApi = axios.create({
     }
 });
 
+import { apiCache } from '../utils/apiCache';
+
 const internalPost = (endpoint, query) => {
     return internalApi.post(endpoint, {
         header: {
@@ -44,20 +46,76 @@ const internalPost = (endpoint, query) => {
     }).then(res => res.data.answer);
 };
 
-export const getInternalRounds = (championshipId, userteamId) =>
-    internalPost('/1/userteam/rounds', { championshipId, userteamId });
+// CACHE WRAPPERS
 
-export const getInternalRankingRound = (championshipId, roundNumber) =>
-    internalPost('/1/ranking/round', { championshipId, roundNumber, roundId: roundNumber });
+export const getInternalRounds = async (championshipId, userteamId) => {
+    const key = `rounds_${championshipId}_${userteamId}`;
+    const cached = apiCache.get(key);
+    if (cached) return cached;
 
-export const getInternalLineup = (championshipId, userteamId, roundId) =>
-    internalPost('/1/userteam/roundlineup', { championshipId, userteamId, round: roundId });
+    const data = await internalPost('/1/userteam/rounds', { championshipId, userteamId });
+    apiCache.set(key, data, 60 * 60 * 1000); // 1 hour TTL
+    return data;
+};
 
-export const getInternalCup = (championshipId) =>
-    internalPost('/5/cup/get', { championshipId });
+export const getInternalRankingRound = async (championshipId, roundNumber, isLive = false) => {
+    const key = `ranking_${championshipId}_${roundNumber}`;
+    // If isLive, bypass cache GET, or check if we have a very recent one?
+    // User wants real-time for live rounds. 
+    // Let's rely on cache ONLY if it's NOT live, or if it is live but very fresh (handled by shorter TTL set below)
 
-export const getInternalRankingMatches = (championshipId) =>
-    internalPost('/5/ranking/matches', { championshipId });
+    if (!isLive) {
+        const cached = apiCache.get(key);
+        if (cached) return cached;
+    }
+
+    const data = await internalPost('/1/ranking/round', { championshipId, roundNumber, roundId: roundNumber });
+
+    // Dynamic TTL
+    const ttl = isLive ? 60 * 1000 : 24 * 60 * 60 * 1000; // 1 min for live, 24 hours for past
+    apiCache.set(key, data, ttl);
+    return data;
+};
+
+export const getInternalLineup = async (championshipId, userteamId, roundId, isLive = false) => {
+    const key = `lineup_${championshipId}_${userteamId}_${roundId}`;
+
+    if (!isLive) {
+        const cached = apiCache.get(key);
+        if (cached) return cached;
+    }
+
+    const data = await internalPost('/1/userteam/roundlineup', { championshipId, userteamId, round: roundId });
+
+    const ttl = isLive ? 30 * 1000 : 24 * 60 * 60 * 1000; // 30s for live lineup, 24h for past
+    apiCache.set(key, data, ttl);
+    return data;
+};
+
+export const getInternalCup = async (championshipId) => {
+    const key = `cup_${championshipId}`;
+    const cached = apiCache.get(key);
+    if (cached) return cached;
+
+    const data = await internalPost('/5/cup/get', { championshipId });
+    apiCache.set(key, data, 5 * 60 * 1000); // 5 min
+    return data;
+};
+
+export const getInternalRankingMatches = async (championshipId, isLive = false) => {
+    const key = `matches_${championshipId}`;
+
+    if (!isLive) {
+        const cached = apiCache.get(key);
+        if (cached) return cached;
+    }
+
+    const data = await internalPost('/5/ranking/matches', { championshipId });
+
+    const ttl = isLive ? 60 * 1000 : 60 * 60 * 1000; // 1 min live, 1 hour otherwise
+    apiCache.set(key, data, ttl);
+    return data;
+};
 
 // External methods
 export const getChampionships = () => Promise.resolve({
