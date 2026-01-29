@@ -72,9 +72,9 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
                 <div className="match-detail-header">
                     <h3>Detalle del Enfrentamiento</h3>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={() => setShowShare(true)} className="share-btn-action-meme" title="Generar Humillación">
-                            <span className="meme-btn-text">MEME</span>
-                            <span className="meme-btn-emoji">🤣</span>
+                        <button onClick={() => setShowShare(true)} className="share-btn-action-meme" title="Generar Crónica">
+                            <span className="meme-btn-text">Crónica</span>
+                            <span className="meme-btn-emoji">📰</span>
                         </button>
                         <button onClick={onClose} className="close-btn-red">
                             <X size={20} />

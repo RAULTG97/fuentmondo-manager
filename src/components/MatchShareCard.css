@@ -1,679 +1,1008 @@
+/* HUMILIATION ENGINE v2.1 - REALISTIC 3D AVATARS */
+
 .share-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.95);
-    z-index: 2000;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
     display: flex;
-    align-items: center;
     justify-content: center;
-    padding: 1rem;
-    backdrop-filter: blur(20px);
-}
-
-.share-btn-action-meme {
-    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-    color: #000;
-    border: 2px solid #000;
-    padding: 2px 12px;
-    border-radius: 20px;
-    display: flex;
     align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    font-weight: 900;
-    font-size: 0.8rem;
-    box-shadow: 0 4px 0 #92400e;
-    transition: all 0.1s;
-    height: 32px;
-}
-
-.share-btn-action-meme:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 #92400e;
-}
-
-.meme-btn-text {
-    letter-spacing: 0.05em;
-}
-
-.meme-btn-emoji {
-    font-size: 1.2rem;
+    z-index: 9999;
 }
 
 .share-modal-container {
-    background: #020617;
-    border-radius: 1.5rem;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 16px;
     width: 95%;
-    max-width: 440px;
-    max-height: 90vh;
-    border: 2px solid #fbbf24;
-    box-shadow: 0 0 80px rgba(239, 68, 68, 0.2);
+    max-width: 500px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    gap: 16px;
 }
 
 .share-modal-header {
-    padding: 1rem 1.25rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #111827;
-    border-bottom: 1px solid rgba(251, 191, 36, 0.2);
-    flex-shrink: 0;
+    color: #fca5a5;
 }
 
-.share-modal-header h3 {
-    margin: 0;
-    font-size: 1rem;
-    color: #fbbf24;
-    font-weight: 950;
-    letter-spacing: 0.05em;
-}
-
-.card-preview-area {
-    padding: 1rem;
-    overflow-y: auto;
-    display: flex;
-    justify-content: center;
-    background: radial-gradient(circle at center, #0f172a 0%, #020617 100%);
-    flex: 1;
-}
-
-/* CROMO CARICATURE CARD */
 .cromo-card {
     width: 100%;
-    max-width: 320px;
-    height: auto;
-    min-height: 480px;
-    max-height: calc(90vh - 150px);
-    /* Ensure it doesn't overflow modal */
-    padding: clamp(10px, 2vh, 15px);
-    background: linear-gradient(180deg, #111827 0%, #000 100%);
-    border-radius: 20px;
-    position: relative;
-    border: clamp(4px, 1.2vw, 8px) solid #fbbf24;
-    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8);
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    border: 4px solid #f59e0b;
+    border-radius: 8px;
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    position: relative;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
 }
 
-.cromo-card::before {
-    content: '';
-    position: absolute;
-    inset: 5px;
-    border: 2px dashed rgba(251, 191, 36, 0.3);
-    border-radius: 22px;
-    pointer-events: none;
+.cromo-inner {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.cromo-header {
+    text-align: center;
 }
 
 .tournament-label {
     font-size: 0.7rem;
-    font-weight: 950;
+    letter-spacing: 2px;
     color: #fbbf24;
-    text-align: center;
+    text-transform: uppercase;
     display: block;
-    margin-bottom: 5px;
-    opacity: 0.8;
+    margin-bottom: 4px;
 }
 
-/* BANTER */
 .banter-bubble {
     background: #fff;
     color: #000;
-    padding: 10px;
+    padding: 8px 12px;
     border-radius: 12px;
-    font-size: clamp(0.75rem, 3vh, 0.95rem);
-    font-weight: 950;
+    font-size: 0.95rem;
+    font-weight: 800;
+    font-style: italic;
     text-align: center;
     position: relative;
-    margin: 5px 10px;
-    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
-    min-height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 3px solid #000;
-    line-height: 1.1;
-    z-index: 100;
+    border: 2px solid #000;
+    box-shadow: 4px 4px 0 #000;
+    margin-bottom: 20px;
+    line-height: 1.2;
 }
 
 .banter-bubble::after {
     content: '';
     position: absolute;
-    bottom: -12px;
+    bottom: -10px;
     left: 50%;
-    transform: translateX(-50%);
-    border-left: 12px solid transparent;
-    border-right: 12px solid transparent;
-    border-top: 12px solid #000;
-}
-
-/* CARICATURES */
-.caricature-stage {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 60px;
-    min-height: 220px;
-}
-
-.president-char {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: absolute;
-    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.home-pres {
-    left: 20px;
-}
-
-.away-pres {
-    right: 20px;
-}
-
-.pres-head-container {
-    position: relative;
-    z-index: 10;
-}
-
-.pres-head {
-    width: clamp(55px, 12vh, 80px);
-    height: clamp(55px, 12vh, 80px);
-    background: #ffdbac;
-    /* Human skin tone base */
-    border-radius: 42% 42% 45% 45%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: clamp(2.2rem, 7vh, 3.5rem);
-    border: 3px solid #000;
-    box-shadow: inset 0 -5px 15px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.3);
-    position: relative;
-}
-
-/* More Realistic Facial Features - Nose */
-.pres-head::before {
-    content: '';
-    position: absolute;
-    width: 6px;
-    height: 10px;
-    border-radius: 5px;
-    background: rgba(0, 0, 0, 0.1);
-    top: 60%;
-    left: 50%;
+    border-width: 10px 10px 0;
+    border-style: solid;
+    border-color: #000 transparent transparent;
     transform: translateX(-50%);
 }
 
-/* Hair/Eyebrows placeholder style */
-.pres-hair {
-    position: absolute;
-    top: -5px;
-    width: 110%;
-    height: 30%;
-    background: #3e2723;
-    border-radius: 50% 50% 0 0;
-    border: 2px solid #000;
-    z-index: -1;
-}
-
-/* Ears & Details */
-.pres-head::before,
-.pres-head::after {
+.banter-bubble::before {
     content: '';
     position: absolute;
-    width: clamp(10px, 2vh, 16px);
-    height: clamp(14px, 3.5vh, 22px);
-    background: inherit;
-    border: 3px solid #000;
-    border-radius: 50%;
-    top: 50%;
-}
-
-.pres-head::before {
-    left: -10px;
-    transform: translateY(-50%) rotate(-10deg);
-}
-
-.pres-head::after {
-    right: -10px;
-    transform: translateY(-50%) rotate(10deg);
-}
-
-.pres-neck {
-    width: 25px;
-    height: 12px;
-    background: #dfc19c;
-    border: 2px solid #000;
-    margin-top: -6px;
-    z-index: 2;
-}
-
-.winner-crown {
-    position: absolute;
-    top: -28px;
+    bottom: -6px;
     left: 50%;
-    transform: translateX(-50%) rotate(-10deg);
-    font-size: 2.8rem;
-    z-index: 20;
-    filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.5));
-    animation: crown-float 2s infinite ease-in-out;
-}
-
-@keyframes crown-float {
-
-    0%,
-    100% {
-        transform: translateX(-50%) translateY(0) rotate(-5deg);
-    }
-
-    50% {
-        transform: translateX(-50%) translateY(-10px) rotate(5deg);
-    }
-}
-
-.pres-body {
-    width: clamp(75px, 18vh, 105px);
-    height: clamp(65px, 16vh, 95px);
-    border-radius: clamp(15px, 3vh, 22px) clamp(15px, 3vh, 22px) 5px 5px;
-    border: 3px solid #000;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    position: relative;
+    border-width: 10px 10px 0;
+    border-style: solid;
+    border-color: #fff transparent transparent;
+    transform: translateX(-50%);
     z-index: 1;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Realistic Jersey Texture */
-.pres-body::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(0, 0, 0, 0.15) 15px, rgba(0, 0, 0, 0.15) 30px);
-    pointer-events: none;
-}
-
-.label-on-shirt {
-    font-size: 0.6rem;
-    font-weight: 900;
-    color: white;
-    text-transform: uppercase;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 2px 6px;
+/* --- AVATAR SYSTEM (ENHANCED REALISM) --- */
+.caricature-stage {
+    height: 300px;
+    position: relative;
+    background: #475569;
+    background-image:
+        radial-gradient(circle at 50% 100%, #64748b 0%, transparent 60%),
+        linear-gradient(rgba(0, 0, 0, 0.2) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.2) 1px, transparent 1px);
+    background-size: 100% 100%, 20px 20px, 20px 20px;
     border-radius: 4px;
-    margin-bottom: 5px;
-    max-width: 90%;
-    overflow: hidden;
-}
-
-.pres-shield-container {
-    width: 50%;
-    height: 50%;
-    background: white;
-    border-radius: 50%;
-    padding: clamp(3px, 0.8vh, 6px);
-    border: 2px solid #000;
-    z-index: 5;
+    overflow: visible;
     display: flex;
-    align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    align-items: flex-end;
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.5);
 }
 
-.pres-shield-mini {
+.president-avatar {
+    position: absolute;
+    bottom: 60px;
+    /* Moved up to clear the ribbon */
+    width: 100px;
+    height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: all 0.3s;
+    z-index: 10;
+    filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.4));
+    /* Depth shadow */
+}
+
+/* HEAD - 3D Spherical Effect */
+.avatar-head {
+    width: 64px;
+    height: 74px;
+    border-radius: 30px;
+    position: relative;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    z-index: 20;
+    /* Inner shadow for 3D effect */
+    box-shadow: inset -5px -5px 15px rgba(0, 0, 0, 0.3), inset 5px 5px 10px rgba(255, 255, 255, 0.2);
+}
+
+.avatar-ear {
+    width: 14px;
+    height: 20px;
+    position: absolute;
+    top: 28px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    z-index: -1;
+    box-shadow: inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.avatar-ear.left {
+    left: -6px;
+    transform: rotate(-10deg);
+}
+
+.avatar-ear.right {
+    right: -6px;
+    transform: rotate(10deg);
+}
+
+.avatar-face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* HAIR - More volume */
+.avatar-hair {
+    position: absolute;
+    top: -12px;
+    left: -6px;
+    right: -6px;
+    height: 35px;
+    background: #000;
+    border-radius: 20px 20px 4px 4px;
+    z-index: 21;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.style-1 {
+    background: #331800;
+    clip-path: polygon(0 50%, 100% 50%, 100% 0, 0 0);
+}
+
+.style-2 {
+    background: linear-gradient(to bottom right, #fcd34d, #d97706);
+    border-radius: 50% 50% 0 0;
+}
+
+.style-3 {
+    background: #555;
+    clip-path: polygon(20% 0, 80% 0, 100% 100%, 0% 100%);
+    top: -15px;
+}
+
+.style-4 {
+    background: #1a1a1a;
+    border-radius: 50%;
+    width: 120%;
+    left: -10%;
+    top: -15px;
+}
+
+.avatar-brows {
+    display: flex;
+    justify-content: space-between;
+    padding: 24px 14px 0;
+}
+
+.brow {
+    width: 14px;
+    height: 4px;
+    background: #000;
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.brow.angry {
+    transform: rotate(20deg);
+}
+
+.brow.right.angry {
+    transform: rotate(-20deg);
+}
+
+.brow.laughing {
+    transform: translateY(-5px);
+}
+
+.brow.crying {
+    transform: rotate(-10deg);
+}
+
+.brow.shame {
+    transform: translateY(-2px);
+}
+
+/* EYES - Realistic rendering */
+.avatar-eyes {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 14px 0;
+}
+
+.eye {
+    width: 12px;
+    height: 12px;
+    background: radial-gradient(circle at 30% 30%, #fff 0%, #e2e8f0 100%);
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    position: relative;
+    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.eye::after {
+    content: '';
+    width: 4px;
+    height: 4px;
+    background: #000;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    border-radius: 50%;
+}
+
+.eye.laughing {
+    height: 6px;
+    border-radius: 0;
+    border: none;
+    border-bottom: 3px solid #000;
+    background: transparent;
+    box-shadow: none;
+}
+
+.eye.laughing::after {
+    display: none;
+}
+
+.eye.crying::after {
+    top: 6px;
+}
+
+.eye.dead::before {
+    content: 'X';
+    position: absolute;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 10px;
+    left: 1px;
+    color: #000;
+}
+
+.eye.dead {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+.eye.dead::after {
+    display: none;
+}
+
+.avatar-nose {
+    width: 8px;
+    height: 12px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+    border-top: none;
+    border-left: none;
+    border-radius: 0 50% 50% 0;
+    margin: 2px auto 0;
+}
+
+.avatar-mouth {
+    width: 18px;
+    height: 6px;
+    border: 2px solid #000;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    margin: 6px auto 0;
+    background: #450a0a;
+}
+
+.avatar-mouth.laughing {
+    height: 18px;
+    border-radius: 0 0 15px 15px;
+}
+
+.avatar-mouth.crying {
+    border-radius: 10px 10px 0 0;
+    border-top: 2px solid #000;
+    border-bottom: none;
+    background: transparent;
+}
+
+.avatar-mouth.shame {
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+    border: none;
+}
+
+/* BODY GROUP - Crucial for arm attachment */
+.avatar-body-group {
+    position: relative;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* BODY */
+.avatar-neck {
+    width: 20px;
+    height: 10px;
+    margin-top: -4px;
+    z-index: 14;
+    border-left: 1px solid rgba(0, 0, 0, 0.2);
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 5px 5px rgba(0, 0, 0, 0.3);
+    /* Shadow from chin */
+}
+
+/* JERSEY - Texture & Pattern */
+.avatar-torso {
+    width: 68px;
+    height: 65px;
+    border-radius: 12px 12px 6px 6px;
+    position: relative;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+    z-index: 16;
+    /* Gradient for body volume */
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%) !important;
+    box-shadow: inset 0 -5px 10px rgba(0, 0, 0, 0.2);
+}
+
+.jersey-shield-box {
+    position: absolute;
+    top: 14px;
+    left: 20px;
+    width: 28px;
+    height: 28px;
+    /* Bigger shield */
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
+
+.jersey-shield {
     width: 100%;
     height: 100%;
     object-fit: contain;
 }
 
-.label-on-shirt {
+.jersey-name {
     position: absolute;
-    bottom: 5px;
-    width: 60%;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
+    bottom: 6px;
+    width: 100%;
     text-align: center;
-    font-size: 0.55rem;
+    font-size: 9px;
+    color: #fff;
     font-weight: 800;
-    color: white;
-    z-index: 10;
-    padding: 2px 0;
+    text-shadow: 1px 1px 0 #000;
+    font-family: sans-serif;
+    letter-spacing: 0.5px;
 }
 
-.pres-legs {
+/* ARMS - Attached to body group */
+.avatar-arm {
+    width: 14px;
+    height: 50px;
+    border-radius: 6px;
+    position: absolute;
+    top: 12px;
+    /* Shoulders level */
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0%, transparent 50%, rgba(0, 0, 0, 0.2) 100%) !important;
+    z-index: 15;
+}
+
+.avatar-arm.left {
+    left: -6px;
+    transform-origin: top center;
+}
+
+.avatar-arm.right {
+    right: -6px;
+    transform-origin: top center;
+}
+
+.avatar-hand {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    position: absolute;
+    bottom: -10px;
+    left: 0;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: inset -2px -2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* LEGS */
+.avatar-legs-group {
     display: flex;
-    gap: clamp(12px, 3vh, 22px);
-    z-index: 0;
+    gap: 6px;
+    margin-top: -2px;
+    z-index: 14;
 }
 
-.leg {
-    width: clamp(14px, 3vh, 18px);
-    height: clamp(20px, 5vh, 45px);
-    border: 3px solid #000;
-    border-radius: 0 0 5px 5px;
+.avatar-leg {
+    width: 18px;
+    height: 50px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    position: relative;
+    background-image: linear-gradient(90deg, rgba(0, 0, 0, 0.05) 0%, transparent 50%, rgba(0, 0, 0, 0.2) 100%) !important;
+    border-radius: 0 0 4px 4px;
 }
 
-/* SPECIFIC SCENES */
-
-/* THRONE: Winner centered high, loser centered flattened */
-.scene-throne .president-char {
-    left: 50%;
-    right: auto;
-    margin-left: -40px;
+.avatar-shoe {
+    width: 26px;
+    height: 12px;
+    background: #171717;
+    position: absolute;
+    bottom: -4px;
+    left: -4px;
+    border-radius: 4px;
+    background: linear-gradient(to bottom, #333, #000);
 }
 
-.scene-throne.home-wins .home-pres {
-    transform: translateY(-80px);
+/* --- POSES --- */
+.pose-standing {}
+
+.pose-defeated .avatar-head {
+    transform: rotate(15deg) translateY(5px);
+}
+
+.pose-defeated .avatar-arm.left {
+    transform: rotate(20deg);
+}
+
+.pose-defeated .avatar-arm.right {
+    transform: rotate(-20deg);
+}
+
+.pose-defeated .avatar-torso {
+    transform: scaleY(0.95);
+}
+
+.pose-kneeling {
+    transform: translateY(40px);
+}
+
+.pose-kneeling .avatar-legs-group {
+    display: none;
+}
+
+.pose-kneeling::after {
+    content: '';
+    width: 40px;
+    height: 16px;
+    background: inherit;
+    position: absolute;
+    bottom: -12px;
+    border-radius: 12px;
+}
+
+/* --- SCENE LAYOUTS (IMPROVED SEPARATION) --- */
+/* Fixed positions so they don't overlap */
+
+/* FUCK: More separation */
+.scene-fuck .winner {
+    left: 55%;
     z-index: 20;
 }
 
-/* JAIL SCENE */
-.jail-bars {
+.scene-fuck .loser {
+    left: 35%;
+    transform: scale(0.95) rotate(15deg);
+    z-index: 10;
+    filter: contrast(0.9) brightness(0.9);
+}
+
+.scene-fuck .winner .avatar-arm.left {
+    transform: rotate(-45deg);
+}
+
+.scene-fuck .winner .avatar-arm.right {
+    transform: rotate(45deg);
+}
+
+.scene-fuck .loser .avatar-head {
+    transform: rotate(-10deg);
+}
+
+.scene-fuck .loser .avatar-mouth {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+/* O face */
+
+/* PISS: Clear distance */
+.scene-piss .winner {
+    left: 25%;
+}
+
+.scene-piss .loser {
+    left: 75%;
+    bottom: 10px;
+    transform: scale(0.8) rotate(-10deg);
+}
+
+.scene-piss .winner .avatar-arm.right {
+    transform: rotate(-40deg);
+}
+
+/* Holding something */
+.scene-piss .prop-stream {
+    width: 6px;
+    height: 110px;
+    background: rgba(251, 191, 36, 0.8);
     position: absolute;
+    top: 20px;
+    left: 8px;
+    transform: rotate(35deg);
+    border-radius: 4px;
+    box-shadow: 0 0 5px #f59e0b;
+}
+
+.piss-puddle {
+    position: absolute;
+    bottom: 10px;
+    left: 70%;
+    width: 70px;
+    height: 12px;
+    background: rgba(251, 191, 36, 0.7);
+    border-radius: 50%;
+    filter: blur(1px);
+}
+
+/* WHIP */
+.scene-whip .winner {
+    left: 20%;
+    transform: rotate(5deg);
+}
+
+.scene-whip .loser {
+    left: 70%;
+    transform: scale(0.9) skewX(10deg);
+}
+
+.scene-whip .prop-whip {
+    font-size: 35px;
+    transform: rotate(-110deg);
+    position: absolute;
+    top: -30px;
+    left: -20px;
+}
+
+.prop-whip-effect {
+    position: absolute;
+    top: 35%;
+    left: 65%;
+    font-size: 50px;
+    text-shadow: 0 0 10px red;
+}
+
+/* SLAVE */
+.scene-slave .winner {
+    left: 15%;
+}
+
+.scene-slave .loser {
+    left: 80%;
     bottom: 0;
-    right: 20px;
-    /* Over loser */
-    font-size: 5rem;
-    z-index: 50;
-    opacity: 0.8;
+    transform: scale(0.7) rotate(5deg);
 }
 
-.away-wins .jail-bars {
-    right: auto;
-    left: 20px;
-}
-
-/* KNEEL SCENE */
-.scene-kneel .president-char.loser {
-    transform: translateY(20px) scale(0.8);
-}
-
-.scene-kneel .president-char.winner {
-    transform: translateY(-20px) scale(1.1);
-    z-index: 20;
-}
-
-/* PIG SCENE */
-.scene-pig .president-char.loser .pres-body {
-    background: #fca5a5 !important;
-    /* Pink pig body */
-    border-radius: 25px;
-    width: 90px;
-}
-
-
-.scene-throne.home-wins .away-pres {
-    transform: scale(1.5, 0.3);
-    opacity: 0.6;
-}
-
-.scene-throne.away-wins .away-pres {
-    transform: translateY(-80px);
-    z-index: 20;
-}
-
-.scene-throne.away-wins .home-pres {
-    transform: scale(1.5, 0.3);
-    opacity: 0.6;
-}
-
-/* BURIAL: Loser rotated and opacity low */
-.scene-burial.home-wins .away-pres {
-    transform: translateX(-50px) translateY(60px) rotate(90deg);
-    opacity: 0.4;
-}
-
-.scene-burial.away-wins .home-pres {
-    transform: translateX(50px) translateY(60px) rotate(-90deg);
-    opacity: 0.4;
-}
-
-.coffin {
+.scene-slave .winner::after {
+    /* Leash */
+    content: '';
     position: absolute;
+    top: 60px;
+    right: -50px;
+    width: 140px;
+    height: 3px;
+    background: #000;
+    transform: rotate(15deg);
+    transform-origin: left center;
+}
+
+.scene-slave .loser .avatar-neck {
+    border: 4px solid #000;
+    height: 8px;
+    background: #333;
+}
+
+/* Collar */
+
+/* GRAVE */
+.scene-grave .winner {
+    left: 25%;
     bottom: 20px;
-    font-size: 6rem;
-    opacity: 0.5;
-    z-index: 1;
+    animation: bounce 0.6s infinite;
 }
 
-/* SPANKING: Aggressive positioning */
-.scene-spanking.home-wins .home-pres {
-    transform: translateX(50px);
+.scene-grave .loser {
+    display: none;
 }
 
-.scene-spanking.home-wins .away-pres {
-    transform: translateX(10px) rotate(90deg) scale(0.9);
-}
-
-.scene-spanking.away-wins .away-pres {
-    transform: translateX(-50px);
-}
-
-.scene-spanking.away-wins .home-pres {
-    transform: translateX(-10px) rotate(-90deg) scale(0.9);
+/* Truly dead */
+.grave-stone {
+    position: absolute;
+    right: 25%;
+    bottom: 20px;
+    width: 70px;
+    height: 90px;
+    background: linear-gradient(to bottom, #94a3b8, #475569);
+    border-radius: 40px 40px 0 0;
+    border: 3px solid #334155;
+    text-align: center;
+    padding-top: 25px;
+    color: #1e293b;
+    font-weight: 900;
+    font-family: serif;
+    letter-spacing: 2px;
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5);
 }
 
 /* TRASH */
+.scene-trash .winner {
+    left: 20%;
+}
+
+.scene-trash .loser {
+    left: 70%;
+    bottom: 50px;
+    transform: rotate(190deg);
+}
+
+.scene-trash .loser .avatar-head {
+    display: none;
+}
+
 .trash-can {
     position: absolute;
+    right: 18%;
     bottom: 20px;
-    font-size: 7rem;
-    z-index: 1;
+    font-size: 90px;
+    z-index: 15;
+    filter: drop-shadow(5px 5px 5px rgba(0, 0, 0, 0.5));
 }
 
-.scene-trash .president-char {
+/* MISC SCENES */
+.scene-nelson .winner {
+    left: 30%;
+}
+
+.scene-nelson .loser {
+    left: 70%;
+    transform: scale(0.8);
+}
+
+.scene-spanking .winner {
+    left: 45%;
+    z-index: 20;
+}
+
+.scene-spanking .loser {
+    left: 40%;
+    transform: rotate(90deg) scale(0.9);
+    z-index: 10;
+    bottom: 40px;
+}
+
+.scene-cum .winner {
+    left: 30%;
+}
+
+.scene-cum .loser {
+    left: 70%;
+}
+
+.scene-kneel .winner {
+    left: 30%;
+}
+
+.scene-kneel .loser {
+    left: 70%;
+    bottom: -10px;
+}
+
+/* Kneeling */
+.scene-kneel .loser .avatar-legs-group {
+    display: none;
+}
+
+/* Hide legs */
+
+.scene-foot .winner {
     left: 50%;
-    right: auto;
-    margin-left: -40px;
+    z-index: 20;
 }
 
-.scene-trash.home-wins .away-pres {
-    transform: translateY(20px) scale(0.5);
-    z-index: 2;
+.scene-foot .loser {
+    left: 50%;
+    bottom: 0;
+    transform: rotate(90deg) scale(0.9);
+    z-index: 10;
+    opacity: 0.9;
 }
 
-.scene-trash.away-wins .home-pres {
-    transform: translateY(20px) scale(0.5);
-    z-index: 2;
+.scene-foot .winner .avatar-leg.right {
+    transform: rotate(-30deg) translate(10px, -20px);
 }
 
-/* TOILET */
-.toilet-bowl {
-    position: absolute;
+/* NEW SCENES v2.5 */
+
+/* TEABAG: Winner squatting over Loser's face */
+.scene-teabag .winner {
+    left: 45%;
+    bottom: 40px;
+    z-index: 20;
+}
+
+/* Squatting */
+.scene-teabag .winner .avatar-legs-group {
+    transform: scaleY(0.5);
+}
+
+/* Knees bent */
+.scene-teabag .winner .avatar-torso {
+    transform: translateY(20px);
+}
+
+.scene-teabag .loser {
+    left: 45%;
+    bottom: 0;
+    transform: rotate(90deg) scale(0.9);
+    z-index: 10;
+}
+
+.scene-teabag .loser .avatar-head {
+    transform: rotate(-90deg);
+}
+
+/* Face up */
+
+/* DOGGY: Loser all fours, Winner behind */
+.scene-doggy .winner {
+    left: 30%;
+    z-index: 20;
+}
+
+.scene-doggy .winner .avatar-arm.left {
+    transform: rotate(-80deg);
+}
+
+/* Holding hips */
+.scene-doggy .winner .avatar-arm.right {
+    transform: rotate(-80deg);
+}
+
+.scene-doggy .loser {
+    left: 60%;
     bottom: 10px;
-    font-size: 8rem;
-    z-index: 1;
+    transform: rotate(15deg);
+    z-index: 10;
 }
 
-.scene-toilet .president-char {
-    left: 50%;
-    right: auto;
-    margin-left: -40px;
+.scene-doggy .loser .avatar-torso {
+    transform: rotate(80deg);
 }
 
-.scene-toilet.home-wins .away-pres {
-    transform: translateY(40px) scale(0.3);
-    opacity: 0.3;
+/* Bent over */
+.scene-doggy .loser .avatar-legs-group {
+    transform: rotate(-10deg);
 }
 
-.scene-toilet.away-wins .home-pres {
-    transform: translateY(40px) scale(0.3);
-    opacity: 0.3;
+/* Kneelingish */
+
+/* VOMIT: Winner vomiting on Loser */
+.scene-vomit .winner {
+    left: 30%;
+    transform: rotate(10deg);
 }
 
-/* SHAME */
-.scene-shame.home-wins .home-pres {
-    transform: translateX(-30px);
+.scene-vomit .winner .avatar-head {
+    transform: rotate(15deg);
 }
 
-.scene-shame.home-wins .away-pres {
-    transform: translateX(20px) scale(0.7);
-    opacity: 0.4;
+.scene-vomit .winner .avatar-mouth {
+    height: 20px;
+    width: 15px;
+    border-radius: 50%;
+    background: #166534;
+    /* Open mouth green */
 }
 
-.scene-shame.away-wins .away-pres {
-    transform: translateX(30px);
-}
-
-.scene-shame.away-wins .home-pres {
-    transform: translateX(-20px) scale(0.7);
-    opacity: 0.4;
-}
-
-/* CLOWN */
-.scene-clown .president-char {
-    position: relative;
-    left: auto;
-    right: auto;
-    margin: 0 10px;
-}
-
-/* BABY */
-.scene-baby .president-char {
-    position: relative;
-    left: auto;
-    right: auto;
-    margin: 0 10px;
-}
-
-.winner-aura {
+.scene-vomit .winner::after {
+    content: '';
     position: absolute;
-    top: 20%;
-    font-size: 8rem;
-    opacity: 0.15;
-    animation: aura-spin 10s infinite linear;
+    top: 40px;
+    left: 40px;
+    width: 60px;
+    height: 100px;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.9), transparent);
+    border-radius: 0 0 50% 50%;
+    transform: rotate(-15deg);
+    z-index: 30;
+    opacity: 0.8;
 }
 
-@keyframes aura-spin {
-    from {
-        transform: rotate(0) scale(1);
-    }
-
-    to {
-        transform: rotate(360deg) scale(1.2);
-    }
+.scene-vomit .loser {
+    left: 65%;
+    bottom: 0;
+    transform: scale(0.9);
+    filter: sepia(1) hue-rotate(60deg);
 }
 
+/* Sickly green */
+
+/* 69 FAIL */
+.scene-69_fail .winner {
+    left: 30%;
+    bottom: 40px;
+    transform: rotate(180deg);
+    z-index: 20;
+}
+
+.scene-69_fail .loser {
+    left: 60%;
+    bottom: 10px;
+    transform: rotate(180deg);
+    z-index: 10;
+    opacity: 0.8;
+}
+
+/* MISC */
 .action-ribbon {
     position: absolute;
-    bottom: -15px;
+    top: 10px;
+    /* Top text */
+    bottom: auto;
+    left: 50%;
+    transform: translateX(-50%) rotate(-1deg);
     background: #dc2626;
     color: white;
-    padding: 8px 20px;
-    font-weight: 950;
-    font-size: 0.85rem;
+    font-weight: 900;
+    padding: 4px 16px;
+    white-space: nowrap;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+    font-size: 1.1rem;
     text-transform: uppercase;
-    border: 3px solid #fff;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
-    z-index: 100;
-    border-radius: 5px;
-    transform: rotate(-2deg);
+    text-shadow: 1px 1px 0 #991b1b;
 }
 
-/* FOOTER */
 .cromo-footer {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 15px;
-    border-radius: 20px;
-    margin-top: 10px;
-    border: 1px solid rgba(251, 191, 36, 0.2);
-}
-
-.cromo-score-row {
     display: flex;
     justify-content: space-between;
+    /* Spread evenly */
     align-items: center;
-    margin-bottom: 5px;
+    background: #1e293b;
+    padding: 12px 16px;
+    border-radius: 4px;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    border-top: 2px solid #334155;
+    margin-top: auto;
+    width: 100%;
+    box-sizing: border-box;
+    white-space: nowrap;
+    /* Force single line */
 }
 
 .final-nums {
-    font-size: clamp(1.8rem, 6vh, 2.8rem);
-    font-weight: 950;
-    color: #fbbf24;
-    text-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #fff;
+    background: #0f172a;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    letter-spacing: 1px;
     flex-shrink: 0;
+    /* Never shrink the score */
 }
 
 .team-n {
-    font-size: clamp(0.55rem, 1.8vh, 0.75rem);
-    font-weight: 900;
-    color: #fff;
-    flex: 1;
-    white-space: normal;
-    line-height: 1.1;
+    font-weight: 700;
+    font-size: 1rem;
     text-transform: uppercase;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
+    letter-spacing: 0.5px;
+    flex: 1;
+    /* Take available space */
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+    /* Truncate if too long */
+    min-width: 0;
+    /* Allow flex shrinking below content size */
 }
 
 .team-n.home {
-    text-align: left;
-    padding-right: 5px;
+    text-align: right;
+    color: #93c5fd;
+    padding-right: 12px;
 }
 
 .team-n.away {
-    text-align: right;
-    padding-left: 5px;
+    text-align: left;
+    color: #fca5a5;
+    padding-left: 12px;
 }
 
-.troll-watermark {
-    font-size: 0.55rem;
-    text-align: center;
-    color: #94a3b8;
-    letter-spacing: 0.2em;
-    font-weight: 800;
+.rain-effect {
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    font-size: 60px;
+    filter: drop-shadow(0 0 5px white);
 }
 
-/* ACTIONS */
-.share-actions {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.download-btn-troll {
-    background: #fbbf24;
-    color: #000;
-    padding: 1.25rem;
-    border-radius: 20px;
-    font-weight: 950;
-    font-size: 1.1rem;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 15px;
-    box-shadow: 0 10px 30px rgba(245, 158, 11, 0.4);
-}
-
-.meme-icon-spin {
-    animation: troll-shake 0.5s infinite;
-}
-
-@keyframes troll-shake {
+@keyframes bounce {
 
     0%,
     100% {
-        transform: rotate(0) scale(1);
+        transform: translateY(0);
     }
 
     50% {
-        transform: rotate(15deg) scale(1.2);
+        transform: translateY(-15px);
     }
+}
+
+.download-btn-troll {
+    width: 100%;
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #b45309;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.download-btn-troll:active {
+    transform: translateY(4px);
+    box-shadow: none;
 }
