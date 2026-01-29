@@ -31,7 +31,7 @@ export const getTeamShield = (teamName) => {
 
 // App Logos and Intro Assets
 export const APP_LOGO = getAssetPath('/escudos/fuentmondo.jpeg');
-export const COPA_LOGO = getAssetPath(`/escudos/${encodeURIComponent('CopaPiraña')}.jpeg`);
+export const COPA_LOGO = getAssetPath('/escudos/CopaPirana.jpeg');
 export const INTRO_CHAMPIONS = getAssetPath('/escudos/intro_Champions.png');
 export const INTRO_LIGA_ML = getAssetPath('/escudos/intro_LigaML.png');
 export const INTRO_COPA = getAssetPath('/escudos/intro_Copa.jpeg');
