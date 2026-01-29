@@ -1006,3 +1006,38 @@
     transform: translateY(4px);
     box-shadow: none;
 }
+
+/* RESPONSIVE ADJUSTMENTS */
+@media (max-width: 480px) {
+    .cromo-footer {
+        padding: 8px 6px;
+        /* Less padding */
+        gap: 8px;
+    }
+
+    .final-nums {
+        font-size: 1.4rem;
+        /* Smaller score */
+        padding: 2px 8px;
+        letter-spacing: 0;
+    }
+
+    .team-n {
+        font-size: 0.8rem;
+        /* Smaller names */
+    }
+
+    .team-n.home {
+        padding-right: 6px;
+    }
+
+    .team-n.away {
+        padding-left: 6px;
+    }
+
+    .action-ribbon {
+        font-size: 0.9rem;
+        padding: 4px 12px;
+        top: 8px;
+    }
+}
