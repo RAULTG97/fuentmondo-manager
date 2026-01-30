@@ -21,7 +21,7 @@ function SanctionsPanel({ sanctionsData }) {
             <div className="dashboard-header" style={{ border: 'none', padding: 0, marginBottom: '2rem', alignItems: 'flex-start' }}>
                 <div className="header-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', webkitTextFillColor: 'initial' }}>Resumen de Sanciones</h2>
+                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', WebkitTextFillColor: 'initial' }}>Resumen de Sanciones</h2>
                         <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5' }}>
                             {sortedTeams.length} Equipos
                         </span>

@@ -201,7 +201,15 @@ function processRound(round, teamStats, teamCaptainCounts, sanctionsRegistry, in
                 }
 
                 // H2H Repeating Player
-                if (otherPids.has(p.player_id || p.id)) {
+                // Rule: If it's a shared captain, we skip the 0.5€ penalty (it will be handled as 1€ captain penalty)
+                const isSharedCaptain = isCaptain(p) && captO && ((p.player_id || p.id) === (captO.player_id || captO.id));
+
+                // H2H Repeating Player
+                const isOpponentCapt = captO && ((p.player_id || p.id) === (captO.player_id || captO.id));
+                // Remove duplicate isSharedCaptain declaration
+                // const isSharedCaptain... already declared above
+
+                if (otherPids.has(p.player_id || p.id) && !isCaptain(p) && !isOpponentCapt && !isSharedCaptain) {
                     addPenalty(teamId, round.number, 'Jugador Repetido H2H', p.name, 0.5, teamStats);
                 }
 
@@ -215,9 +223,17 @@ function processRound(round, teamStats, teamCaptainCounts, sanctionsRegistry, in
 
                     teamStats[teamId].captainHistory.push({
                         round: round.number, player: p.name, count,
-                        warning: count % 3 === 2, alert: count % 3 === 0
+                        warning: false, alert: false // No visual warnings for leagues as per user req
                     });
 
+                    // Set New Sanction (still applies: "Alinear un jugador sancionado por capitanía: 5€")
+                    // The rule "Si un equipo alinea varias veces al mismo capitán... no supone sanción" refers to the act itself.
+                    // But if they break the "must rotate every 3" rule causing a sanction, that IS refined?
+                    // User said: "Si un equipo alinea varias veces al mismo capitán... no supone sanción." 
+                    // AND "Solo tiene sanción si alinea a un jugador que no debe".
+                    // This implies the restriction (3 times) might NOT exist in leagues?
+                    // "Alinear un jugador que está sancionado por capitanía: 5€" matches the config.
+                    // I will KEEP the tracking for ban logic (3 match ban), but REMOVE the extra penalty for "Repetitive" usage.
                     if (count > 0 && count % 3 === 0) {
                         if (!sanctionsRegistry[teamId]) sanctionsRegistry[teamId] = {};
                         sanctionsRegistry[teamId][normP] = {
@@ -227,9 +243,7 @@ function processRound(round, teamStats, teamCaptainCounts, sanctionsRegistry, in
                         };
                     }
 
-                    if (count > 1) {
-                        addPenalty(teamId, round.number, 'Capitán Repetido', `${p.name} (${count}ª vez)`, count - 1, teamStats);
-                    }
+                    // REMOVED: addPenalty for 'Capitán Repetido' (progressive) - User request
 
                     // Club Logic
                     const clubs = {};
@@ -244,11 +258,13 @@ function processRound(round, teamStats, teamCaptainCounts, sanctionsRegistry, in
                         const idM = p.player_id || p.id;
                         const idO = captO.player_id || captO.id;
                         if (idM === idO) {
-                            addPenalty(teamId, round.number, 'Capitán Repetido H2H', p.name, 2, teamStats);
+                            // "Si tienen el mismo capitán los dos equipos, 1€ cada uno"
+                            addPenalty(teamId, round.number, 'Capitán Repetido H2H', p.name, 1, teamStats);
                         } else {
                             const regularPids = new Set(l.filter(x => !isCaptain(x)).map(x => x.player_id || x.id));
                             if (regularPids.has(idO)) {
-                                addPenalty(teamId, round.number, 'Tengo al Capitán rival (Regular)', captO.name, 2, teamStats);
+                                // "Si el capitán que tiene un equipo, lo tiene alineado el otro... paga 1€"
+                                addPenalty(teamId, round.number, 'Tengo al Capitán rival (Regular)', captO.name, 1, teamStats);
                             }
                         }
                     }
@@ -286,8 +302,12 @@ function applyPerformancePenalties(round, data, teamStats) {
     // Worst Player
     if (currentRoundPlayers.length > 0) {
         const minPlayerPts = Math.min(...currentRoundPlayers.map(p => p.points));
+        const sanctionedTeams = new Set();
         currentRoundPlayers.filter(p => p.points === minPlayerPts).forEach(p => {
-            addPenalty(p.teamId, round.number, 'Peor Jugador', `${p.name} (${p.points} pts)`, 1, teamStats);
+            if (!sanctionedTeams.has(p.teamId)) {
+                addPenalty(p.teamId, round.number, 'Peor Jugador', `${p.name} (${p.points} pts)`, 1, teamStats);
+                sanctionedTeams.add(p.teamId);
+            }
         });
     }
 }

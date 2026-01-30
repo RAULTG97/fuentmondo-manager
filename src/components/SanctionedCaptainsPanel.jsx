@@ -1,6 +1,6 @@
 import React, { useState, useMemo, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, History, AlertCircle, Search, Ban, Timer, X, FileDown } from 'lucide-react';
+import { ShieldAlert, History, AlertCircle, Search, Ban, Timer, X, FileDown, ChevronDown } from 'lucide-react';
 import { useTournament } from '../context/TournamentContext';
 import { getTeamShield } from '../utils/assets';
 import EmptyState from './common/EmptyState';
@@ -181,7 +181,7 @@ const SanctionedCaptainsPanel = () => {
             <div className="dashboard-header" style={{ border: 'none', padding: 0, marginBottom: '2.5rem', alignItems: 'flex-start' }}>
                 <div className="header-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', webkitTextFillColor: 'initial' }}>Sanciones por Capitanía</h2>
+                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', WebkitTextFillColor: 'initial' }}>Sanciones por Capitanía</h2>
                         <span className="badge">
                             {filter === 'current' ? 'En Curso' : 'Histórico'}
                         </span>
@@ -270,39 +270,113 @@ const SanctionedCaptainsPanel = () => {
                         </button>
                     </div>
 
-                    <button
-                        onClick={() => exportSanctionsToPDF(currentSanctions, currentRound)}
-                        disabled={currentSanctions.length === 0}
-                        style={{
-                            background: currentSanctions.length === 0 ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981, #059669)',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            color: currentSanctions.length === 0 ? 'var(--text-dim)' : 'white',
-                            padding: '0.75rem 1.5rem',
-                            borderRadius: 'var(--radius-sm)',
-                            cursor: currentSanctions.length === 0 ? 'not-allowed' : 'pointer',
-                            fontSize: 'var(--font-sm)',
-                            fontWeight: 700,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.6rem',
-                            transition: 'all 0.2s',
-                            boxShadow: currentSanctions.length === 0 ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)',
-                            opacity: currentSanctions.length === 0 ? 0.5 : 1
-                        }}
-                        onMouseEnter={(e) => {
-                            if (currentSanctions.length > 0) {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
-                            }
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = currentSanctions.length === 0 ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)';
-                        }}
-                    >
-                        <FileDown size={18} />
-                        Exportar PDF
-                    </button>
+                    <div style={{ position: 'relative' }}>
+                        <button
+                            onClick={() => setExpandedCard(expandedCard === 'export_menu' ? null : 'export_menu')}
+                            disabled={currentSanctions.length === 0}
+                            style={{
+                                background: currentSanctions.length === 0 ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #10b981, #059669)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                color: currentSanctions.length === 0 ? 'var(--text-dim)' : 'white',
+                                padding: '0.75rem 1.5rem',
+                                borderRadius: 'var(--radius-sm)',
+                                cursor: currentSanctions.length === 0 ? 'not-allowed' : 'pointer',
+                                fontSize: 'var(--font-sm)',
+                                fontWeight: 700,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.6rem',
+                                transition: 'all 0.2s',
+                                boxShadow: currentSanctions.length === 0 ? 'none' : '0 4px 12px rgba(16, 185, 129, 0.3)',
+                                opacity: currentSanctions.length === 0 ? 0.5 : 1
+                            }}
+                        >
+                            <FileDown size={18} />
+                            Exportar
+                            <ChevronDown size={14} style={{ marginLeft: '0.2rem' }} />
+                        </button>
+
+                        {expandedCard === 'export_menu' && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '120%',
+                                right: 0,
+                                background: '#1e293b',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                borderRadius: 'var(--radius-sm)',
+                                boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                                zIndex: 50,
+                                minWidth: '200px',
+                                overflow: 'hidden'
+                            }}>
+                                <button
+                                    onClick={() => {
+                                        exportSanctionsToPDF(currentSanctions, currentRound);
+                                        setExpandedCard(null);
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.8rem',
+                                        padding: '0.8rem 1.2rem',
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '0.9rem',
+                                        borderBottom: '1px solid rgba(255,255,255,0.05)'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                >
+                                    <FileDown size={16} color="#10b981" />
+                                    PDF
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // Group by team
+                                        const grouped = currentSanctions.reduce((acc, s) => {
+                                            if (!acc[s.teamName]) acc[s.teamName] = [];
+                                            acc[s.teamName].push(s);
+                                            return acc;
+                                        }, {});
+
+                                        // Format text
+                                        const text = Object.entries(grouped).map(([team, players]) => {
+                                            const playerLines = players.map(p =>
+                                                `   - ${p.player}: Fuera hasta J${p.outTeamUntil} (Vuelve J${p.outTeamUntil + 1}) | Sin Cpt hasta J${p.noCaptUntil} (Vuelve J${p.noCaptUntil + 1})`
+                                            ).join('\n');
+                                            return `EQUIPO: ${team}\n${playerLines}`;
+                                        }).join('\n\n');
+
+                                        navigator.clipboard.writeText(text);
+                                        setExpandedCard(null);
+                                        alert('Sanciones copiadas al portapapeles');
+                                    }}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.8rem',
+                                        padding: '0.8rem 1.2rem',
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '0.9rem'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                                    onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                                >
+                                    <History size={16} color="#3b82f6" />
+                                    Copiar al Portapapeles
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

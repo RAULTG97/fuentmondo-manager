@@ -62,7 +62,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 championship.mode === 'cup' ||
                 championship.type === 'copa';
             if (isCopa) setActiveTab('copa');
-            else if (activeTab === 'copa') setActiveTab('matchups');
+            else setActiveTab('matchups');
         }
     }, [championship, setChampionship]);
 

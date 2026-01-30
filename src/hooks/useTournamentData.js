@@ -104,9 +104,12 @@ export const useTournamentData = (activeTab) => {
                     // Find current round or latest available
                     const now = new Date();
                     const latestPlayed = all38Rounds.find(r => r.date && new Date(r.date) < now);
-                    // Default to latest played or round 20, using number as ID
-                    const initialRoundId = latestPlayed ? latestPlayed.number : 20;
-                    setSelectedRoundId(initialRoundId);
+                    // For leagues, we DO NOT set the default round here anymore to avoid FOUC (flash of wrong round).
+                    // We wait for loadCalendar to get the authoritative "current" round.
+                    // However, we MUST set selectedRoundId if it is strictly null, but maybe we can wait?
+                    // Let's NOT set it here.
+                    // const initialRoundId = latestPlayed ? latestPlayed.number : 20;
+                    // setSelectedRoundId(initialRoundId);
                 } else {
                     // For Copa, use existing logic
                     setRounds(rList);
@@ -118,7 +121,12 @@ export const useTournamentData = (activeTab) => {
             } catch (err) {
                 console.error("[FATAL] Failed to load rounds:", err);
             } finally {
-                if (isMounted) setLoadingDisplay(false);
+                if (isMounted) {
+                    // For leagues, we keep loading true until loadCalendar finishes to prevent flash
+                    if (championship.type === 'copa') {
+                        setLoadingDisplay(false);
+                    }
+                }
             }
         };
 
@@ -219,25 +227,30 @@ export const useTournamentData = (activeTab) => {
                     });
                 }
 
-                // Determine currentJornada as the highest ID with scores (status 'past')
-                const playedRounds = all38Rounds.filter(r => r.status === 'past');
-                if (playedRounds.length > 0) {
-                    const highestPlayed = [...playedRounds].sort((a, b) => b.number - a.number)[0];
-                    currentJornada = highestPlayed.number;
-                } else if (!currentJornada) {
-                    currentJornada = 20; // Default fallback for leagues
+                // Determine currentJornada as the highest ID with scores (status 'past') IF NOT ALREADY FOUND
+                if (!currentJornada) {
+                    const playedRounds = all38Rounds.filter(r => r.status === 'past');
+                    if (playedRounds.length > 0) {
+                        const highestPlayed = [...playedRounds].sort((a, b) => b.number - a.number)[0];
+                        currentJornada = highestPlayed.number;
+                    } else {
+                        currentJornada = 20; // Default fallback for leagues
+                    }
                 }
 
                 setCurrentRoundNumber(currentJornada);
                 setAllRounds(all38Rounds);
                 allRoundsRef.current = all38Rounds;
 
-                // For leagues, if we don't have a selectedRoundId yet, set it to currentJornada
-                if (currentJornada && !selectedRoundId) {
+                // For leagues, if we found a definitive current round from the API, enforce it
+                if (currentJornada) {
                     setSelectedRoundId(currentJornada);
                 }
             } catch (err) {
                 console.error("[ERROR] Failed to load calendar:", err);
+            } finally {
+                // This is where we turn off the main loader for leagues
+                if (isMounted) setLoadingDisplay(false);
             }
         };
 
@@ -313,17 +326,34 @@ export const useTournamentData = (activeTab) => {
             return;
         }
 
-        if (!isAutoRefresh) setLoadingDisplay(true);
+        // --- OPTIMIZATION BEGIN ---
+        // 1. Try to load from cache (allRounds) immediately
+        const cachedRound = allRoundsRef.current.find(r => r.number === selectedRoundId || r._id === selectedRoundId);
+        const hasCachedMatches = cachedRound?.matches && cachedRound.matches.length > 0;
+        const isPast = cachedRound?.status === 'past' || cachedRound?.status === 'historical';
+        const isFuture = cachedRound?.status === 'future';
+
+        if (hasCachedMatches) {
+            console.log(`[CACHE HIT] Jornada ${selectedRoundId}`);
+            setMatches(cachedRound.matches);
+            // If it's a past round and we are in "matchups" view, we can skip the fetch entirely
+            // because scores rarely change for past rounds.
+            // Also skip for FUTURE rounds - no point fetching details for empty games if we have the schedule
+            if ((isPast || isFuture) && !isAutoRefresh && activeTab === 'matchups') {
+                setLoadingDisplay(false);
+                return;
+            }
+        }
+        // --- OPTIMIZATION END ---
+
+        // Only show loader if we didn't find data in cache
+        if (!hasCachedMatches && !isAutoRefresh) setLoadingDisplay(true);
+
         try {
             // Determine API round ID
             let apiRoundId = selectedRoundId;
 
-            if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
-                const currentRound = allRoundsRef.current.find(r => r.number === selectedRoundId);
-                if (currentRound && currentRound.matches) {
-                    setMatches(currentRound.matches);
-                }
-            }
+            // (Previous logic for finding matches from allRounds removed as it is now handled by the optimization block above)
 
             let actualIdForAPI = apiRoundId;
             if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
@@ -360,16 +390,29 @@ export const useTournamentData = (activeTab) => {
                 const processed = data.matches.map(m => {
                     const pIds = m.p || [];
                     const scores = m.m || [0, 0];
+                    const homeTeamId = indexToRealId[pIds[0]];
+                    const awayTeamId = indexToRealId[pIds[1]];
+
+                    // Check if we already have enriched data for this match in cache or current state
+                    const existingMatch = matches.find(em => em.homeTeamId === homeTeamId && em.awayTeamId === awayTeamId) ||
+                        (allRoundsRef.current.find(r => r.number === selectedRoundId)?.matches?.find(em => em.homeTeamId === homeTeamId && em.awayTeamId === awayTeamId));
+
                     return {
                         ...m,
                         p: pIds,
                         homeName: indexToName[pIds[0]] || "Unknown",
                         awayName: indexToName[pIds[1]] || "Unknown",
-                        homeTeamId: indexToRealId[pIds[0]],
-                        awayTeamId: indexToRealId[pIds[1]],
+                        homeTeamId,
+                        awayTeamId,
                         homeScore: scores[0],
                         awayScore: scores[1],
-                        enriched: false
+                        // Preserve enriched data if available to avoid UI flashing "Pending"
+                        enriched: existingMatch?.enriched || false,
+                        lineupA: existingMatch?.lineupA || [],
+                        lineupB: existingMatch?.lineupB || [],
+                        // If we have preserved enriched data, we should probably treat it as such, 
+                        // but strictly speaking the NEW scores might imply point changes that won't be in lineupA/B yet.
+                        // However, keeping them prevents the "basic view" fallback.
                     };
                 });
 
@@ -379,7 +422,7 @@ export const useTournamentData = (activeTab) => {
                 if (championship.type !== 'copa' && typeof selectedRoundId === 'number') {
                     setAllRounds(prev => {
                         const next = prev.map(r =>
-                            r.number === selectedRoundId ? { ...r, matches: processed } : r
+                            r.number === selectedRoundId ? { ...r, styles: 'cached', matches: processed } : r
                         );
                         allRoundsRef.current = next;
                         return next;
@@ -409,7 +452,7 @@ export const useTournamentData = (activeTab) => {
         } finally {
             if (!isAutoRefresh) setLoadingDisplay(false);
         }
-    }, [selectedRoundId, championship, rounds, enrichCurrentMatches, setMatches, setRanking, setLoadingDisplay, setAllRounds, currentRoundNumber]);
+    }, [selectedRoundId, championship, rounds, enrichCurrentMatches, setMatches, setRanking, setLoadingDisplay, setAllRounds, currentRoundNumber, activeTab]);
 
     useEffect(() => {
         loadRoundDetail();
@@ -425,10 +468,11 @@ export const useTournamentData = (activeTab) => {
 
         // Determinar si la jornada seleccionada es la actual o futura (potencialmente en vivo)
         const roundObj = rounds.find(r => r.number === selectedRoundId || r._id === selectedRoundId);
-        const isPast = roundObj?.status === 'past' || roundObj?.status === 'historical';
+        // STRICT OPTIMIZATION: Only poll if the status is explicitly 'current'
+        const isCurrent = roundObj?.status === 'current';
 
-        // Si es una jornada pasada, no hacemos polling
-        if (isPast) return;
+        // Si NO es la jornada en curso, no hacemos polling
+        if (!isCurrent) return;
 
         const intervalId = setInterval(() => {
             console.log(`[POLLING] Refrescando datos en vivo de la jornada ${selectedRoundId}...`);
@@ -509,7 +553,13 @@ export const useTournamentData = (activeTab) => {
                 // --- OPTIMIZATION: Early Standings Calculate & Set ---
                 const filteredRounds = allRoundDataCombined.filter(rd => {
                     const rObj = rounds.find(r => r._id === rd._id || r.number === rd.number);
-                    return rObj && (rObj.status === 'past' || rObj.status === 'historical' || (rObj.date && new Date(rObj.date) < now));
+                    // Include if past/historical OR if it's the current/live round with data
+                    return rObj && (
+                        rObj.status === 'past' ||
+                        rObj.status === 'historical' ||
+                        rObj.status === 'current' || // Explicitly include current
+                        (rObj.date && new Date(rObj.date) < now)
+                    );
                 });
                 const initialStandings = calculateH2HStandings(filteredRounds);
 
@@ -536,57 +586,67 @@ export const useTournamentData = (activeTab) => {
                 // Fetch missing lineups for sanctions logic - REVERSED for priority
                 const reverseRounds = [...allRoundDataCombined].sort((a, b) => b.number - a.number);
 
-                for (const rd of reverseRounds) {
-                    if (!rd.matches || !rd.ranking) continue;
-                    let anyNew = false;
-                    const getLineupSafe = async (tid) => {
-                        try {
-                            // Historical lineups -> isLive = false
-                            const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id, false);
-                            return (res?.players?.initial) ? res.players.initial : (res?.players || []);
-                        } catch (e) { return []; }
-                    };
 
-                    // Process matches in larger batches
-                    const batchSizeLineups = 4;
-                    for (let i = 0; i < rd.matches.length; i += batchSizeLineups) {
-                        const batch = rd.matches.slice(i, i + batchSizeLineups);
-                        await Promise.all(batch.map(async (m) => {
-                            if (!m.lineupA) {
-                                const tA = rd.ranking?.[m.p?.[0] - 1];
-                                if (tA) { m.lineupA = await getLineupSafe(tA._id, rd._id); anyNew = true; }
-                                else if (m.homeTeamId) { m.lineupA = await getLineupSafe(m.homeTeamId, rd._id); anyNew = true; }
-                            }
-                            if (!m.lineupB) {
-                                const tB = rd.ranking?.[m.p?.[1] - 1];
-                                if (tB) { m.lineupB = await getLineupSafe(tB._id, rd._id); anyNew = true; }
-                                else if (m.awayTeamId) { m.lineupB = await getLineupSafe(m.awayTeamId, rd._id); anyNew = true; }
-                            }
-                        }));
-                    }
-                    if (anyNew) {
-                        historicalCache.current[rd._id] = { ...rd };
 
-                        // Incremental update of "lastMatchData" for the teams panel
-                        setH2HStandings(prev => {
-                            const next = [...prev];
-                            next.forEach(team => {
-                                // Only update if this round is newer than what we have or we have nothing
-                                const isNewer = !team.lastMatchData || rd.number >= team.lastMatchData.round;
-                                if (isNewer) {
-                                    const m = rd.matches.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
-                                    if (m && (m.lineupA || m.lineupB)) {
-                                        team.lastMatchData = {
-                                            round: rd.number,
-                                            score: m.homeTeamId === team.id ? m.homeScore : m.awayScore,
-                                            lineup: m.homeTeamId === team.id ? m.lineupA : m.lineupB
-                                        };
-                                    }
+                // --- OPTIMIZATION: Parallelize Round Processing ---
+                // Process rounds in batches to avoid waterfall but limit concurrency
+                const batchSizeRounds = 5;
+                for (let i = 0; i < reverseRounds.length; i += batchSizeRounds) {
+                    const roundBatch = reverseRounds.slice(i, i + batchSizeRounds);
+                    await Promise.all(roundBatch.map(async (rd) => {
+                        if (!rd.matches || !rd.ranking) return;
+
+                        let anyNew = false;
+                        const getLineupSafe = async (tid) => {
+                            try {
+                                // Historical lineups -> isLive = false
+                                const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id, false);
+                                return (res?.players?.initial) ? res.players.initial : (res?.players || []);
+                            } catch (e) { return []; }
+                        };
+
+                        // Process matches in this round in batches to be nice to API
+                        const batchSizeLineups = 4;
+                        for (let j = 0; j < rd.matches.length; j += batchSizeLineups) {
+                            const batch = rd.matches.slice(j, j + batchSizeLineups);
+                            await Promise.all(batch.map(async (m) => {
+                                if (!m.lineupA) {
+                                    const tA = rd.ranking?.[m.p?.[0] - 1];
+                                    if (tA) { m.lineupA = await getLineupSafe(tA._id, rd._id); anyNew = true; }
+                                    else if (m.homeTeamId) { m.lineupA = await getLineupSafe(m.homeTeamId, rd._id); anyNew = true; }
                                 }
+                                if (!m.lineupB) {
+                                    const tB = rd.ranking?.[m.p?.[1] - 1];
+                                    if (tB) { m.lineupB = await getLineupSafe(tB._id, rd._id); anyNew = true; }
+                                    else if (m.awayTeamId) { m.lineupB = await getLineupSafe(m.awayTeamId, rd._id); anyNew = true; }
+                                }
+                            }));
+                        }
+
+                        if (anyNew) {
+                            historicalCache.current[rd._id] = { ...rd };
+
+                            // Incremental update of "lastMatchData" for the teams panel
+                            setH2HStandings(prev => {
+                                const next = [...prev];
+                                next.forEach(team => {
+                                    // Only update if this round is newer than what we have or we have nothing
+                                    const isNewer = !team.lastMatchData || rd.number >= team.lastMatchData.round;
+                                    if (isNewer) {
+                                        const m = rd.matches.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
+                                        if (m && (m.lineupA || m.lineupB)) {
+                                            team.lastMatchData = {
+                                                round: rd.number,
+                                                score: m.homeTeamId === team.id ? m.homeScore : m.awayScore,
+                                                lineup: m.homeTeamId === team.id ? m.lineupA : m.lineupB
+                                            };
+                                        }
+                                    }
+                                });
+                                return next;
                             });
-                            return next;
-                        });
-                    }
+                        }
+                    }));
                 }
 
                 setSanctionsData(sCalc.calculateSanctions(allRoundDataCombined, teamList));
@@ -594,7 +654,12 @@ export const useTournamentData = (activeTab) => {
                 // If not needing full sanctions data, at least set the standings
                 const standingsOnly = calculateH2HStandings(allRoundDataCombined.filter(rd => {
                     const rObj = rounds.find(r => r._id === rd._id || r.number === rd.number);
-                    return rObj && (rObj.status === 'past' || rObj.status === 'historical' || (rObj.date && new Date(rObj.date) < now));
+                    return rObj && (
+                        rObj.status === 'past' ||
+                        rObj.status === 'historical' ||
+                        rObj.status === 'current' ||
+                        (rObj.date && new Date(rObj.date) < now)
+                    );
                 }));
                 setH2HStandings(standingsOnly);
                 setStandingsLoaded(true);
