@@ -4,7 +4,7 @@ import { getTeamShield } from '../utils/assets';
 import SoccerPitch from './SoccerPitch';
 import './TeamDetailModal.css';
 
-const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds, selectedRoundId, currentRoundNumber, onClose }) => {
+const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, rounds, allRounds, selectedRoundId, currentRoundNumber, onClose }) => {
     const [expandedSections, setExpandedSections] = useState({
         lineup: false,
         nextOpponent: false,

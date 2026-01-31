@@ -372,6 +372,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 {selectedDetailTeam && (
                     <TeamDetailModal
                         team={selectedDetailTeam}
+                        championship={championship}
                         h2hStandings={h2hStandings}
                         sanctionsData={sanctionsData}
                         rounds={rounds}
