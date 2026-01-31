@@ -107,7 +107,9 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds,
                             <h2 className="team-detail-name">{teamName}</h2>
                             <div className="header-meta">
                                 <span className={`rank-badge pos-${position}`}>Posición #{position || '--'}</span>
-                                <span className="league-badge">Liga Fuentmondo</span>
+                                <span className="league-badge">
+                                    {championship?.type === 'copa' ? 'Copa Piraña' : 'Liga Fuentmondo'}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -128,14 +130,24 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds,
                     <div className="detail-grid-two-cols">
                         <div className="detail-section-static">
                             <div className="section-static-header">
-                                <Trophy size={18} />
-                                <span>Resumen de Liga</span>
+                                {championship?.type === 'copa' ? <Activity size={18} /> : <Trophy size={18} />}
+                                <span>{championship?.type === 'copa' ? 'Estadísticas Copa' : 'Resumen de Liga'}</span>
                             </div>
                             <div className="static-content-inner stats-grid-mini">
-                                <div className="stat-row"><span>1ª Vuelta (Excel)</span> <strong>{fullStats.hist_pts || 0} pts</strong></div>
-                                <div className="stat-row"><span>2ª Vuelta (API)</span> <strong>{fullStats.points || 0} pts</strong></div>
-                                <div className="stat-row"><span>Partidos Jugados</span> <strong>{fullStats.played || 0}</strong></div>
-                                <div className="stat-row"><span>V - E - D</span> <strong>{fullStats.won || 0}-{fullStats.drawn || 0}-{fullStats.lost || 0}</strong></div>
+                                {championship?.type === 'copa' ? (
+                                    <>
+                                        <div className="stat-row"><span>Estado</span> <strong>Participante</strong></div>
+                                        <div className="stat-row"><span>Puntos Global</span> <strong>{totalPts} pts</strong></div>
+                                        <div className="stat-row"><span>Sanciones</span> <strong style={{ color: '#fca5a5' }}>{fullStats.total || 0}€</strong></div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="stat-row"><span>1ª Vuelta (Excel)</span> <strong>{fullStats.hist_pts || 0} pts</strong></div>
+                                        <div className="stat-row"><span>2ª Vuelta (API)</span> <strong>{fullStats.points || 0} pts</strong></div>
+                                        <div className="stat-row"><span>Partidos Jugados</span> <strong>{fullStats.played || 0}</strong></div>
+                                        <div className="stat-row"><span>V - E - D</span> <strong>{fullStats.won || 0}-{fullStats.drawn || 0}-{fullStats.lost || 0}</strong></div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -168,7 +180,7 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds,
                         <div className="section-trigger" onClick={() => toggleSection('lineup')}>
                             <div className="label-with-icon">
                                 <User size={18} />
-                                <span>Alineación Última Jornada (J{lastRoundNum})</span>
+                                <span>Alineación {championship?.type === 'copa' ? `Ronda ${lastRoundNum}` : `Jornada J${lastRoundNum}`}</span>
                             </div>
                             <div className="trigger-right">
                                 {expandedSections.lineup ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -286,7 +298,9 @@ const TeamDetailModal = ({ team, h2hStandings, sanctionsData, rounds, allRounds,
                                     <div className="captains-list-scroll">
                                         {(stats.captainHistory || []).slice().reverse().map((h, i) => (
                                             <div key={i} className={`cap-history-row ${h.alert ? 'alert' : ''}`}>
-                                                <span className="round">J{h.round}</span>
+                                                <span className="round">
+                                                    {championship?.type === 'copa' ? `R${h.round}` : `J${h.round}`}
+                                                </span>
                                                 <span className="name">{h.player}</span>
                                                 <span className="count">x{h.count}</span>
                                             </div>

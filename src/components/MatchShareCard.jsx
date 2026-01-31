@@ -202,8 +202,8 @@ const MatchShareCard = ({ match, onClose }) => {
     };
 
     return (
-        <div className="share-modal-overlay" onClick={onClose}>
-            <div className="share-modal-container" onClick={e => e.stopPropagation()}>
+        <div className="share-modal-overlay modal-overlay" onClick={onClose}>
+            <div className="share-modal-container modal-content-animate" onClick={e => e.stopPropagation()}>
                 <div className="share-modal-header">
                     <h3>CRÓNICA PARTIDO</h3>
                     <button onClick={onClose} className="close-share"><X size={24} /></button>

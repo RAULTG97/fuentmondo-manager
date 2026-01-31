@@ -17,25 +17,57 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+
+        // Prevent body scroll when modal is open
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            document.body.style.overflow = 'unset';
+        };
     }, []);
 
     // Helper to extract clean lineup array
     const extractPlayers = (data) => {
         if (!data) return [];
-        if (data.players && data.players.initial) return data.players.initial;
-        if (Array.isArray(data.players)) return data.players;
-        if (Array.isArray(data.lineup)) return data.lineup;
+        if (Array.isArray(data)) return data;
+
+        if (data.players && data.players.initial && Array.isArray(data.players.initial)) return data.players.initial;
+        if (data.players && Array.isArray(data.players)) return data.players;
+        if (data.lineup && Array.isArray(data.lineup)) return data.lineup;
+
+        // Fallback: if it has common player props but is inside another object
+        if (typeof data === 'object' && !Array.isArray(data)) {
+            const values = Object.values(data);
+            const arrayMatch = values.find(val => Array.isArray(val) && val.length > 0 && (val[0].name || val[0].playerName));
+            if (arrayMatch) return arrayMatch;
+        }
+
         return [];
     };
 
     useEffect(() => {
-        if (!match || !championshipId || !roundId) return;
 
-        const idA = match.homeTeamId || match.p[0];
-        const idB = match.awayTeamId || match.p[1];
+        if (!match || !championshipId || !roundId) {
+            setLoading(false); // vital to stop "Cargando..."
+            return;
+        }
 
-        if (!idA || !idB) return;
+        // Normalize inputs for League vs Copa
+        // Copa structure: match.home.team.id OR match.home.team._id
+        // League structure: match.homeTeamId or match.p?.[0]
+
+        // Try extracting from Copa structure first (deep access)
+        const homeTeamObj = match.home?.team;
+        const awayTeamObj = match.away?.team;
+
+        let idA = homeTeamObj?.id || homeTeamObj?._id || match.homeTeamId || match.p?.[0];
+        let idB = awayTeamObj?.id || awayTeamObj?._id || match.awayTeamId || match.p?.[1];
+
+        if (!idA || !idB) {
+            setLoading(false);
+            return;
+        }
 
         setLoading(true);
 
@@ -57,6 +89,13 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
     const homePoints = lineupHome ? lineupHome.reduce((acc, p) => acc + (p.points || 0), 0) : (match.homeScore || 0);
     const awayPoints = lineupAway ? lineupAway.reduce((acc, p) => acc + (p.points || 0), 0) : (match.awayScore || 0);
 
+    // Determined leg: if roundId is an array, we might need a way to switch.
+    // However, for now let's assume if it is an array [ida, vuelta], we show aggregate if both complete?
+    // Actually, usually Futmondo API returns legs as separate round IDs.
+    // BUT the cup matching logic in handleMatchClick (CopaPanel) only passes ONE effectiveId.
+    // If it's two legs, which roundId should we fetch?
+    // Usually the active one.
+
     // Determine winner for confetti
     const hasWinner = homePoints !== awayPoints;
     const showConfetti = !loading && hasWinner;
@@ -64,10 +103,10 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
     if (!match) return null;
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="match-detail-overlay" onClick={onClose}>
             <Confetti active={showConfetti} />
 
-            <div className="match-detail-card" onClick={e => e.stopPropagation()}>
+            <div className="match-detail-card modal-content-animate" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="match-detail-header">
                     <h3>Detalle del Enfrentamiento</h3>

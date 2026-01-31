@@ -1,7 +1,9 @@
 import { getTeamShield, COPA_LOGO } from '../utils/assets';
 import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import MatchDetail from './MatchDetail';
 
-function CopaPanel({ cupData, loading, championship }) {
+function CopaPanel({ cupData, loading, championship, onMatchClick }) {
     if (loading) {
         return (
             <div style={{ padding: '3rem', textAlign: 'center' }}>
@@ -11,14 +13,18 @@ function CopaPanel({ cupData, loading, championship }) {
         );
     }
 
-    if (!cupData || !cupData.rounds) {
+    // Safe extraction of rounds, handling if cupData is the array itself or an object
+    const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
+
+    if (!rawRounds || rawRounds.length === 0) {
         return <p className="text-muted text-center">No hay datos de la Copa disponibles.</p>;
     }
 
     // Filter rounds with matches and sort them correctly
-    const activeRounds = [...cupData.rounds]
+    const activeRounds = [...rawRounds]
         .filter(r => r.matches && r.matches.length > 0)
         .sort((a, b) => a.number - b.number);
+
 
     const getRoundTitle = (num) => {
         switch (num) {
@@ -44,6 +50,27 @@ function CopaPanel({ cupData, loading, championship }) {
 
     // Check if this is Copa Piraña championship
     const isCopaPirana = championship?.name?.toUpperCase().includes('COPA PIRAÑA');
+
+
+    const handleMatchClick = (match, round) => {
+        // Only allow clicking if both teams exist (skip Byes)
+        if (!match.home?.team || !match.away?.team) return;
+
+        const normalizedMatch = {
+            ...match,
+            homeName: match.home?.team?.name,
+            awayName: match.away?.team?.name,
+            homeScore: match.home?.scores?.reduce((a, b) => a + b, 0) || 0,
+            awayScore: match.away?.scores?.reduce((a, b) => a + b, 0) || 0,
+            roundName: getRoundTitle(round.number)
+        };
+
+        const effectiveId = round.id || round._id || round.roundId;
+        // Delegate to parent Dashboard
+        if (onMatchClick) {
+            onMatchClick(normalizedMatch, effectiveId);
+        }
+    };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -275,17 +302,21 @@ function CopaPanel({ cupData, loading, championship }) {
                                                 : '0 4px 6px rgba(0,0,0,0.3)',
                                             position: 'relative',
                                             transition: 'all 0.3s ease',
-                                            overflow: 'hidden'
+                                            overflow: 'hidden',
+                                            cursor: (m.home?.team && m.away?.team) ? 'pointer' : 'default',
+                                            opacity: (m.home?.team && m.away?.team) ? 1 : 0.6,
+                                            filter: (m.home?.team && m.away?.team) ? 'none' : 'grayscale(0.5)'
                                         }}
+                                            onClick={() => handleMatchClick(m, rnd)}
                                             onMouseEnter={(e) => {
-                                                if (isCopaPirana) {
+                                                if (isCopaPirana && m.home?.team && m.away?.team) {
                                                     e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
                                                     e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.5), 0 0 30px rgba(251, 191, 36, 0.2)';
                                                     e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.5)';
                                                 }
                                             }}
                                             onMouseLeave={(e) => {
-                                                if (isCopaPirana) {
+                                                if (isCopaPirana && m.home?.team && m.away?.team) {
                                                     e.currentTarget.style.transform = 'translateY(0) scale(1)';
                                                     e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(251, 191, 36, 0.1)';
                                                     e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
@@ -339,22 +370,36 @@ function CopaPanel({ cupData, loading, championship }) {
                                                         fontSize: isCopaPirana ? '0.9rem' : '0.85rem',
                                                         color: isHomeWinner ? '#4ade80' : '#e2e8f0'
                                                     }}>
-                                                        {homeTeam?.name || 'TBD'}
+                                                        {homeTeam?.name || (awayTeam ? 'LIBRE' : 'TBD')}
                                                     </span>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                                                <div style={{ display: 'flex', gap: '8px', marginLeft: '4px', alignItems: 'center' }}>
                                                     {hScores.map((s, idx) => (
-                                                        <span key={idx} style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s}</span>
+                                                        <div key={idx} style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            minWidth: '20px'
+                                                        }}>
+                                                            <span style={{ fontSize: '0.6rem', opacity: 0.4, textTransform: 'uppercase' }}>{idx === 0 ? 'I' : 'V'}</span>
+                                                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{s}</span>
+                                                        </div>
                                                     ))}
-                                                    <span style={{
-                                                        fontWeight: 'bold',
-                                                        color: (finished && hTotal > aTotal) ? '#4ade80' : 'white',
-                                                        minWidth: '24px',
-                                                        textAlign: 'right',
-                                                        fontSize: isCopaPirana ? '1rem' : '0.85rem'
+                                                    <div style={{
+                                                        marginLeft: '4px',
+                                                        padding: '2px 6px',
+                                                        background: isHomeWinner ? 'rgba(74, 222, 128, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                        borderRadius: '4px',
+                                                        border: isHomeWinner ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid transparent'
                                                     }}>
-                                                        {hTotal}
-                                                    </span>
+                                                        <span style={{
+                                                            fontWeight: '900',
+                                                            color: isHomeWinner ? '#4ade80' : 'white',
+                                                            fontSize: isCopaPirana ? '1.1rem' : '0.9rem'
+                                                        }}>
+                                                            {hTotal}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -399,22 +444,36 @@ function CopaPanel({ cupData, loading, championship }) {
                                                         fontSize: isCopaPirana ? '0.9rem' : '0.85rem',
                                                         color: isAwayWinner ? '#4ade80' : '#e2e8f0'
                                                     }}>
-                                                        {awayTeam?.name || 'TBD'}
+                                                        {awayTeam?.name || (homeTeam ? 'LIBRE' : 'TBD')}
                                                     </span>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
+                                                <div style={{ display: 'flex', gap: '8px', marginLeft: '4px', alignItems: 'center' }}>
                                                     {aScores.map((s, idx) => (
-                                                        <span key={idx} style={{ fontSize: '0.7rem', opacity: 0.5 }}>{s}</span>
+                                                        <div key={idx} style={{
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            minWidth: '20px'
+                                                        }}>
+                                                            <span style={{ fontSize: '0.6rem', opacity: 0.4, textTransform: 'uppercase' }}>{idx === 0 ? 'I' : 'V'}</span>
+                                                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{s}</span>
+                                                        </div>
                                                     ))}
-                                                    <span style={{
-                                                        fontWeight: 'bold',
-                                                        color: (finished && aTotal > hTotal) ? '#4ade80' : 'white',
-                                                        minWidth: '24px',
-                                                        textAlign: 'right',
-                                                        fontSize: isCopaPirana ? '1rem' : '0.85rem'
+                                                    <div style={{
+                                                        marginLeft: '4px',
+                                                        padding: '2px 6px',
+                                                        background: isAwayWinner ? 'rgba(74, 222, 128, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                        borderRadius: '4px',
+                                                        border: isAwayWinner ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid transparent'
                                                     }}>
-                                                        {aTotal}
-                                                    </span>
+                                                        <span style={{
+                                                            fontWeight: '900',
+                                                            color: isAwayWinner ? '#4ade80' : 'white',
+                                                            fontSize: isCopaPirana ? '1.1rem' : '0.9rem'
+                                                        }}>
+                                                            {aTotal}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

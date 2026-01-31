@@ -15,8 +15,8 @@ const navItems = [
     { id: 'teams', label: 'Equipos', icon: LayoutGrid },
     { id: 'captains', label: 'Capitanes', icon: Trophy },
     { id: 'sanctions', label: 'Sanciones', icon: Users },
-    { id: 'infractions', label: 'Infracciones', icon: AlertOctagon },
-    { id: 'restricted', label: 'Sancionados', icon: Ban },
+    { id: 'infractions', label: 'Infracciones', icon: AlertOctagon, hideInCup: true },
+    { id: 'restricted', label: 'Sancionados', icon: Ban, hideInCup: true },
     { id: 'hall_of_fame', label: 'HALL OF FAME', icon: Award },
 ];
 
@@ -50,6 +50,7 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
     const filteredItems = navItems.filter(item => {
         if (item.mode === 'cup' && !isCupMode) return false;
         if (item.mode === 'league' && isCupMode) return false;
+        if (isCupMode && item.hideInCup) return false;
         return true;
     });
 

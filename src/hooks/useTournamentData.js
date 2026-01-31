@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { getInternalRankingRound, getInternalLineup, getInternalCup, getLeagueMatches, getInternalRankingMatches } from '../services/api';
 import { calculateH2HStandings } from '../utils/StandingsCalculator';
+import { CopaSanctionsService } from '../services/copaSanctionsService';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -26,13 +27,14 @@ export const useTournamentData = (activeTab) => {
         historicalCache,
         h2hStandings, setH2HStandings,
         setSanctionsData,
-        setCupData,
+        cupData, setCupData,
         setLoadingDisplay,
         setLoadingStandings,
-        setLoadingAllLineups,
+        loadingAllLineups, setLoadingAllLineups,
         setCalculationProgress,
         standingsLoaded, setStandingsLoaded,
-        loadingCup, setLoadingCup
+        loadingCup, setLoadingCup,
+        copaAnalysis, setCopaAnalysis
     } = context;
 
     /**
@@ -45,7 +47,7 @@ export const useTournamentData = (activeTab) => {
                 return await fetcher(...args);
             } catch (err) {
                 lastError = err;
-                console.warn(`[RETRY ${i + 1}/${MAX_RETRIES}] Fetch failed:`, err.message);
+                // Silent retry
                 if (i < MAX_RETRIES - 1) await delay(RETRY_DELAY * (i + 1));
             }
         }
@@ -294,7 +296,7 @@ export const useTournamentData = (activeTab) => {
                         enriched: true
                     };
                 } catch (e) {
-                    console.warn(`[ENRICH FAIL] Match ${m.homeName} vs ${m.awayName}:`, e.message);
+                    // Silent failure for matching matchups with live data if missing
                 }
             }));
 
@@ -334,7 +336,6 @@ export const useTournamentData = (activeTab) => {
         const isFuture = cachedRound?.status === 'future';
 
         if (hasCachedMatches) {
-            console.log(`[CACHE HIT] Jornada ${selectedRoundId}`);
             setMatches(cachedRound.matches);
             // If it's a past round and we are in "matchups" view, we can skip the fetch entirely
             // because scores rarely change for past rounds.
@@ -475,7 +476,6 @@ export const useTournamentData = (activeTab) => {
         if (!isCurrent) return;
 
         const intervalId = setInterval(() => {
-            console.log(`[POLLING] Refrescando datos en vivo de la jornada ${selectedRoundId}...`);
             loadRoundDetail(true); // true = autoRefresh (sin loader)
         }, 15000); // 15 segundos
 
@@ -484,9 +484,10 @@ export const useTournamentData = (activeTab) => {
 
     // 3. Tournament Wide Calculation
     const calculateTournamentWideData = useCallback(async () => {
-        if (!championship || rounds.length === 0 || isFetching.current) return;
+        if (!championship || rounds.length === 0) return;
 
-        isFetching.current = true;
+        // Removing isFetching current check to allow updates from polling to trigger recalc
+        // isFetching.current = true; // We rely on cache to make this fast
         const now = new Date();
         const pastRounds = rounds.filter(r => (r.date && new Date(r.date) < now) || r.status === 'past');
         // Include current round if it exists
@@ -551,7 +552,20 @@ export const useTournamentData = (activeTab) => {
                 teamList.__championshipName = championship.name;
 
                 // --- OPTIMIZATION: Early Standings Calculate & Set ---
-                const filteredRounds = allRoundDataCombined.filter(rd => {
+                const filteredRounds = allRoundDataCombined.map(rd => {
+                    // Check if we have live matches for this round in the state
+                    // This happens if the user is viewing the current round or we are polling it
+                    const isCurrentRoundData = rd.number === currentRoundNumber;
+                    if (isCurrentRoundData && matches && matches.length > 0) {
+                        // Check if the matches in state belong to this round (heuristic or explicit check)
+                        // Since 'matches' state usually holds the selected round, and if selected == current
+                        // we can assume it's the live data.
+                        if (selectedRoundId === currentRoundNumber) {
+                            return { ...rd, matches: matches };
+                        }
+                    }
+                    return rd;
+                }).filter(rd => {
                     const rObj = rounds.find(r => r._id === rd._id || r.number === rd.number);
                     // Include if past/historical OR if it's the current/live round with data
                     return rObj && (
@@ -692,13 +706,47 @@ export const useTournamentData = (activeTab) => {
         } finally {
             setLoadingCup(false);
         }
-    }, [championship, setLoadingCup, setCupData]);
+        // Force reset analysis when championship changes
+        setCopaAnalysis(null);
+    }, [championship, setLoadingCup, setCupData, setCopaAnalysis]);
 
     useEffect(() => {
-        if (championship?.type === 'copa' && (activeTab === 'copa' || activeTab === 'teams')) {
+        if (championship?.type === 'copa' && (activeTab === 'copa' || activeTab === 'teams' || activeTab === 'captains' || activeTab === 'sanctions')) {
             loadCupData();
         }
     }, [championship, activeTab, loadCupData]);
+
+    // 4b. Polling for Live Cup Data
+    useEffect(() => {
+        if (!championship || championship.type !== 'copa' || activeTab !== 'copa') return;
+
+        const intervalId = setInterval(() => {
+            // We use a specific fetch to avoid full reload if possible, 
+            // but loadCupData is already quite direct.
+            loadCupData();
+        }, 30000); // 30 seconds for Copa (less aggressive than Liga to save API)
+
+        return () => clearInterval(intervalId);
+    }, [championship, activeTab, loadCupData]);
+
+    // 5. Global Copa Analysis (Calculate Sanctions & Captains)
+    useEffect(() => {
+        if (championship?.type === 'copa' && cupData && !copaAnalysis && !loadingCup) {
+            const runAnalysis = async () => {
+                setCalculationProgress(5);
+                try {
+                    // This triggers the heavy lifting: fetching all lineups and calculating sanctions
+                    const result = await CopaSanctionsService.scanCopaAndCalculate(championship._id, cupData);
+                    setCopaAnalysis(result);
+                } catch (err) {
+                    console.error("[CopaGlobal] Analysis failed:", err);
+                } finally {
+                    setCalculationProgress(0);
+                }
+            };
+            runAnalysis();
+        }
+    }, [championship?._id, cupData, copaAnalysis, loadingCup, setCopaAnalysis]);
 
     return context;
 };

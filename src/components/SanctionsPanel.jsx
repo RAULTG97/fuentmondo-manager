@@ -1,16 +1,39 @@
-import { useState } from 'react';
-import { AlertCircle, ChevronDown, ChevronRight, Euro, Search } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { AlertCircle, ChevronDown, ChevronRight, Euro, Search, Calculator, Loader2 } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
+import { CopaSanctionsService } from '../services/copaSanctionsService';
 
-function SanctionsPanel({ sanctionsData }) {
+function SanctionsPanel({ sanctionsData, isCopa, rounds, championshipId, cupData, copaAnalysis }) {
     const [expandedTeam, setExpandedTeam] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    if (!sanctionsData || Object.keys(sanctionsData).length === 0) {
+    // Copa State
+    const [loadingCopa, setLoadingCopa] = useState(false);
+    const [copaResult, setCopaResult] = useState(null);
+
+    // Auto-fetch for Copa
+    useState(() => {
+        if (isCopa && championshipId && cupData && !copaResult && !loadingCopa) {
+            setLoadingCopa(true);
+            CopaSanctionsService.scanCopaAndCalculate(championshipId, cupData)
+                .then(res => {
+                    setCopaResult(res);
+                })
+                .catch(err => console.error("Error loading Copa sanctions:", err))
+                .finally(() => setLoadingCopa(false));
+        }
+    }, [isCopa, championshipId, cupData]);
+
+    const activeSanctionsData = useMemo(() => {
+        if (!isCopa) return sanctionsData;
+        return (copaAnalysis?.teamStats || copaResult?.teamStats || {});
+    }, [isCopa, sanctionsData, copaAnalysis, copaResult]);
+
+    if (!isCopa && (!sanctionsData || Object.keys(sanctionsData).length === 0)) {
         return <div className="text-center p-4">Cargando sanciones...</div>;
     }
 
-    const filteredTeams = Object.values(sanctionsData).filter(team =>
+    const filteredTeams = Object.values(activeSanctionsData).filter(team =>
         team.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -21,7 +44,9 @@ function SanctionsPanel({ sanctionsData }) {
             <div className="dashboard-header" style={{ border: 'none', padding: 0, marginBottom: '2rem', alignItems: 'flex-start' }}>
                 <div className="header-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', WebkitTextFillColor: 'initial' }}>Resumen de Sanciones</h2>
+                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', WebkitTextFillColor: 'initial' }}>
+                            {isCopa ? 'Calculadora Multas Copa' : 'Resumen de Sanciones'}
+                        </h2>
                         <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5' }}>
                             {sortedTeams.length} Equipos
                         </span>
@@ -29,32 +54,46 @@ function SanctionsPanel({ sanctionsData }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', width: '100%', maxWidth: '800px' }}>
-                    <div className="round-picker" style={{ flex: 1, minWidth: '280px', gap: '0.75rem' }}>
-                        <Search size={18} color="var(--text-dim)" />
-                        <input
-                            type="text"
-                            placeholder="Buscar equipo..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-main)',
-                                outline: 'none',
-                                fontSize: 'var(--font-sm)',
-                                width: '100%'
-                            }}
-                        />
-                    </div>
+                    {isCopa && loadingCopa ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
+                            <Loader2 className="animate-spin" size={20} />
+                            <span>Analizando eliminatorias de Copa...</span>
+                        </div>
+                    ) : (
+                        <div className="round-picker" style={{ flex: 1, minWidth: '280px', gap: '0.75rem' }}>
+                            <Search size={18} color="var(--text-dim)" />
+                            <input
+                                type="text"
+                                placeholder="Buscar equipo..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: 'var(--text-main)',
+                                    outline: 'none',
+                                    fontSize: 'var(--font-sm)',
+                                    width: '100%'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     <div className="round-picker" style={{ gap: '0.8rem', padding: '0.6rem 1rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
                         <AlertCircle color="#ef4444" size={16} />
                         <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: '#fca5a5', fontWeight: 500 }}>
-                            Repetición de capitán, jugadores duplicados H2H, y duplicidad de club.
+                            {isCopa ? 'Calcula sanciones por alineación indebida.' : 'Repetición de capitán, jugadores duplicados H2H, y duplicidad de club.'}
                         </p>
                     </div>
                 </div>
             </div>
+
+            {/* Empty State for Copa before calculation */}
+            {isCopa && !copaResult && !loadingCopa && (
+                <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px' }}>
+                    <p>Calculando datos en tiempo real...</p>
+                </div>
+            )}
 
             <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
                 {sortedTeams.map(team => (
@@ -106,7 +145,7 @@ function SanctionsPanel({ sanctionsData }) {
                                             <tbody>
                                                 {team.breakdown.map((item, idx) => (
                                                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                                        <td style={{ padding: '0.4rem 0' }}>J{item.round}</td>
+                                                        <td style={{ padding: '0.4rem 0' }}>{isCopa ? `R${item.round}` : `J${item.round}`}</td>
                                                         <td style={{ padding: '0.4rem 0', color: '#fca5a5' }}>{item.type}</td>
                                                         <td style={{ padding: '0.4rem 0', opacity: 0.8 }}>{item.detail}</td>
                                                         <td style={{ padding: '0.4rem 0', textAlign: 'right', fontWeight: 'bold' }}>{item.cost}€</td>

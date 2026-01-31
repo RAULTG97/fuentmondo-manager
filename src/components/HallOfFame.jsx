@@ -47,7 +47,6 @@ const HallOfFame = () => {
 
         if (playPromise !== undefined) {
             playPromise.catch(error => {
-                console.log("Audio play failed:", error);
             });
         }
 

@@ -19,6 +19,7 @@ export const TournamentProvider = ({ children }) => {
     const [h2hStandings, setH2HStandings] = useState([]);
     const [sanctionsData, setSanctionsData] = useState({});
     const [cupData, setCupData] = useState(null);
+    const [copaAnalysis, setCopaAnalysis] = useState(null);
 
     // Status states
     const [loadingDisplay, setLoadingDisplay] = useState(false);
@@ -44,6 +45,7 @@ export const TournamentProvider = ({ children }) => {
         h2hStandings, setH2HStandings,
         sanctionsData, setSanctionsData,
         cupData, setCupData,
+        copaAnalysis, setCopaAnalysis,
         loadingDisplay, setLoadingDisplay,
         loadingStandings, setLoadingStandings,
         loadingAllLineups, setLoadingAllLineups,

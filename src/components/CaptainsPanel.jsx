@@ -1,6 +1,7 @@
-import { useState, useMemo, memo } from 'react';
-import { Trophy, AlertTriangle, ShieldAlert, Search, X } from 'lucide-react';
+import { useState, useMemo, memo, useEffect } from 'react';
+import { Trophy, AlertTriangle, ShieldAlert, Search, X, Loader2 } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
+import { CopaSanctionsService } from '../services/copaSanctionsService';
 
 const CaptainRow = memo(({ tid, team, sortedRoundNums }) => (
     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -16,20 +17,50 @@ const CaptainRow = memo(({ tid, team, sortedRoundNums }) => (
             </div>
         </td>
         {sortedRoundNums.map(rNum => {
-            const usage = team.captainHistory.find(h => h.round === rNum);
-            let cellStyle = { padding: '0.5rem', textAlign: 'center', fontSize: '0.85rem' };
-            if (usage?.alert) cellStyle.background = 'rgba(239, 68, 68, 0.1)';
-            else if (usage?.warning) cellStyle.background = 'rgba(251, 191, 36, 0.05)';
+            // Find ALL usages for this round (could be "1", "1.1", "1.2", etc.)
+            const usages = team.captainHistory.filter(h =>
+                String(h.round) === String(rNum) ||
+                String(h.round).startsWith(`${rNum}.`)
+            );
 
             return (
-                <td key={rNum} style={cellStyle}>
-                    {usage ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                            {usage.alert ? <ShieldAlert size={14} color="#ef4444" /> :
-                                usage.warning ? <AlertTriangle size={14} color="#fbbf24" /> :
-                                    <Trophy size={14} color="#fbbf24" opacity={0.6} />}
-                            <span style={{ fontWeight: (usage.alert || usage.warning) ? 700 : 400 }}>{usage.player}</span>
-                            {usage.alert && <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>Sanción</span>}
+                <td key={rNum} style={{ padding: '0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                    {usages.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {usages.map((usage, idx) => {
+                                let cellStyle = {
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    padding: '4px',
+                                    borderRadius: '4px',
+                                    background: usage.alert ? 'rgba(239, 68, 68, 0.1)' :
+                                        usage.warning ? 'rgba(251, 191, 36, 0.05)' : 'transparent'
+                                };
+
+                                return (
+                                    <div key={idx} style={cellStyle}>
+                                        {usages.length > 1 && (
+                                            <span style={{ fontSize: '0.6rem', opacity: 0.4, textTransform: 'uppercase' }}>
+                                                {String(usage.round).includes('.1') ? 'Ida' : 'Vuelta'}
+                                            </span>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            {usage.alert ? <ShieldAlert size={12} color="#ef4444" /> :
+                                                usage.warning ? <AlertTriangle size={12} color="#fbbf24" /> :
+                                                    <Trophy size={12} color="#fbbf24" opacity={0.6} />}
+                                            <span style={{
+                                                fontWeight: (usage.alert || usage.warning) ? 700 : 400,
+                                                fontSize: usages.length > 1 ? '0.75rem' : '0.85rem'
+                                            }}>
+                                                {usage.player}
+                                            </span>
+                                        </div>
+                                        {usage.alert && <span style={{ fontSize: '0.6rem', color: '#ef4444' }}>Sanción</span>}
+                                    </div>
+                                );
+                            })}
                         </div>
                     ) : '-'}
                 </td>
@@ -38,29 +69,52 @@ const CaptainRow = memo(({ tid, team, sortedRoundNums }) => (
     </tr>
 ));
 
-function CaptainsPanel({ sanctionsData, rounds }) {
+function CaptainsPanel({ sanctionsData, rounds, isCopa, cupData, copaAnalysis, championshipId }) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [loadingCopa, setLoadingCopa] = useState(false);
+    const [copaStats, setCopaStats] = useState(null);
+
+    // Auto-load Copa data if active
+    useEffect(() => {
+        if (isCopa && championshipId && cupData && !copaStats && !loadingCopa) {
+            setLoadingCopa(true);
+            CopaSanctionsService.scanCopaAndCalculate(championshipId, cupData)
+                .then(result => {
+                    setCopaStats(result.captainHistory);
+                })
+                .catch(err => console.error("Error loading Copa stats:", err))
+                .finally(() => setLoadingCopa(false));
+        }
+    }, [isCopa, championshipId, cupData]); // Removed copaStats/loadingCopa from deps to avoid loops if needed, but safe here with checks
+
+    // Use either prop data (League) or fetched data (Copa)
+    // For Copa, we now prioritize the pre-loaded copaAnalysis from context
+    const activeData = isCopa ? (copaAnalysis?.captainHistory || copaStats || {}) : sanctionsData;
 
     const teamIds = useMemo(() => {
         const cleanTerm = searchTerm.trim().toLowerCase();
-        if (!cleanTerm) return Object.keys(sanctionsData);
+        if (!cleanTerm) return Object.keys(activeData);
 
-        return Object.keys(sanctionsData).filter(tid =>
-            sanctionsData[tid].name.toLowerCase().includes(cleanTerm) ||
-            sanctionsData[tid].captainHistory.some(h => h.player.toLowerCase().includes(cleanTerm))
+        return Object.keys(activeData).filter(tid =>
+            activeData[tid].name.toLowerCase().includes(cleanTerm) ||
+            activeData[tid].captainHistory.some(h => h.player.toLowerCase().includes(cleanTerm))
         );
-    }, [sanctionsData, searchTerm]);
+    }, [activeData, searchTerm]);
 
-    // Collect all unique round numbers from all teams
+    // Collect all unique round numbers for columns
+    // For Copa, use the actual rounds available in cupData
     const sortedRoundNums = useMemo(() => {
+        if (isCopa && cupData?.rounds) {
+            return cupData.rounds.map(r => r.number).sort((a, b) => a - b);
+        }
         const allRoundNums = new Set();
-        Object.keys(sanctionsData).forEach(tid => {
-            sanctionsData[tid].captainHistory.forEach(h => allRoundNums.add(h.round));
+        Object.keys(activeData).forEach(tid => {
+            activeData[tid].captainHistory.forEach(h => allRoundNums.add(h.round));
         });
         return Array.from(allRoundNums).sort((a, b) => a - b);
-    }, [sanctionsData]);
+    }, [activeData, isCopa, cupData]);
 
-    if (!sanctionsData || Object.keys(sanctionsData).length === 0) {
+    if (!isCopa && (!sanctionsData || Object.keys(sanctionsData).length === 0)) {
         return <div className="text-center p-4">Cargando historial de capitanes...</div>;
     }
 
@@ -69,10 +123,13 @@ function CaptainsPanel({ sanctionsData, rounds }) {
             <div className="dashboard-header" style={{ border: 'none', padding: 0, marginBottom: '2rem', alignItems: 'flex-start' }}>
                 <div className="header-info">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', WebkitTextFillColor: 'initial' }}>Historial de Capitanes</h2>
+                        <h2 style={{ fontSize: 'var(--font-xl)', background: 'none', WebkitTextFillColor: 'initial' }}>
+                            {isCopa ? 'Capitanes Copa Piraña' : 'Historial de Capitanes'}
+                        </h2>
                         <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)' }}>
                             {teamIds.length} Equipos
                         </span>
+                        {loadingCopa && <Loader2 className="animate-spin" size={20} color="var(--primary)" />}
                     </div>
                 </div>
 
@@ -116,13 +173,15 @@ function CaptainsPanel({ sanctionsData, rounds }) {
                         )}
                     </div>
 
-                    <div className="round-picker" style={{ gap: '0.8rem', padding: '0.6rem 1rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
-                        <ShieldAlert size={16} color="var(--primary)" />
-                        <p style={{ margin: 0, fontSize: 'var(--font-xs)', fontWeight: 500 }}>
-                            <span style={{ color: '#fbbf24', fontWeight: '800' }}>Aviso:</span> 2ª vez.
-                            <span style={{ color: '#ef4444', fontWeight: '800', marginLeft: '0.8rem' }}>Sanción:</span> 3ª vez+.
-                        </p>
-                    </div>
+                    {!isCopa && (
+                        <div className="round-picker" style={{ gap: '0.8rem', padding: '0.6rem 1rem', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.1)' }}>
+                            <ShieldAlert size={16} color="var(--primary)" />
+                            <p style={{ margin: 0, fontSize: 'var(--font-xs)', fontWeight: 500 }}>
+                                <span style={{ color: '#fbbf24', fontWeight: '800' }}>Aviso:</span> 2ª vez.
+                                <span style={{ color: '#ef4444', fontWeight: '800', marginLeft: '0.8rem' }}>Sanción:</span> 3ª vez+.
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -132,9 +191,10 @@ function CaptainsPanel({ sanctionsData, rounds }) {
                         <tr style={{ background: '#1e293b' }}>
                             <th style={{ padding: '0.8rem', textAlign: 'left', borderBottom: '1px solid #334155', position: 'sticky', left: 0, background: '#1e293b', zIndex: 10 }}>Equipo</th>
                             {sortedRoundNums.map(rNum => (
-                                <th key={rNum} style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #334155', minWidth: '100px', opacity: rNum <= 19 ? 0.7 : 1 }}>
-                                    J{rNum}
-                                    {rNum <= 19 && <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Invierno</div>}
+                                <th key={rNum} style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #334155', minWidth: '100px', opacity: (rNum <= 19 && !isCopa) ? 0.7 : 1 }}>
+                                    {isCopa ? `Ronda ${rNum}` : `J${rNum}`}
+                                    {isCopa && (rNum === 1 || rNum === 2) && <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Ida/Vuelta</div>}
+                                    {(!isCopa && rNum <= 19) && <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Invierno</div>}
                                 </th>
                             ))}
                         </tr>
@@ -144,7 +204,7 @@ function CaptainsPanel({ sanctionsData, rounds }) {
                             <CaptainRow
                                 key={tid}
                                 tid={tid}
-                                team={sanctionsData[tid]}
+                                team={activeData[tid]}
                                 sortedRoundNums={sortedRoundNums}
                             />
                         ))}

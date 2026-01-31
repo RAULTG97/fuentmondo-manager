@@ -36,6 +36,7 @@ const internalApi = axios.create({
 import { apiCache } from '../utils/apiCache';
 
 const internalPost = (endpoint, query) => {
+
     return internalApi.post(endpoint, {
         header: {
             token: CONFIG.INTERNAL_TOKEN,
@@ -98,8 +99,20 @@ export const getInternalCup = async (championshipId) => {
     if (cached) return cached;
 
     const data = await internalPost('/5/cup/get', { championshipId });
-    apiCache.set(key, data, 5 * 60 * 1000); // 5 min
+    // Normalize data if needed, or just return
     return data;
+};
+
+export const getInternalUserteam = async (championshipId, userteamId) => {
+    const key = `userteam_${championshipId}_${userteamId}`;
+    const cached = apiCache.get(key);
+    if (cached) return cached;
+
+    // Use /1/userteam/get or similar if available/needed. 
+    // For now assuming we might not need it or it's not described. 
+    // But we might need player's club info. 
+    // Usually lineup has player info including club.
+    return null;
 };
 
 export const getInternalRankingMatches = async (championshipId, isLive = false) => {

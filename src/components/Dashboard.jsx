@@ -43,7 +43,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
         matches, h2hStandings, sanctionsData, cupData,
         allRounds, currentRoundNumber,
         loadingDisplay, loadingStandings, loadingAllLineups, loadingCup,
-        calculationProgress
+        calculationProgress, copaAnalysis
     } = useTournament();
 
     const [activeTab, setActiveTab] = useState('matchups');
@@ -221,16 +221,37 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 return <TeamsPanel h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} />;
             case 'captains':
                 if (loadingAllLineups) return <PanelSkeleton rows={10} />;
-                return <CaptainsPanel sanctionsData={sanctionsData.teamStats || {}} rounds={rounds} />;
+                return <CaptainsPanel
+                    sanctionsData={sanctionsData.teamStats || {}}
+                    rounds={rounds}
+                    isCopa={championship?.type === 'copa'}
+                    cupData={cupData}
+                    copaAnalysis={copaAnalysis}
+                    championshipId={championship?._id}
+                />;
             case 'sanctions':
                 if (loadingAllLineups) return <PanelSkeleton rows={8} />;
-                return <SanctionsPanel sanctionsData={sanctionsData.teamStats || {}} />;
+                return <SanctionsPanel
+                    sanctionsData={sanctionsData.teamStats || {}}
+                    isCopa={championship?.type === 'copa'}
+                    rounds={rounds}
+                    championshipId={championship?._id}
+                    cupData={cupData}
+                    copaAnalysis={copaAnalysis}
+                />;
             case 'infractions':
-                return <InfractionsPanel infractions={sanctionsData.infractions || []} />;
+                return <InfractionsPanel
+                    infractions={sanctionsData.infractions || []}
+                    isCopa={championship?.type === 'copa'}
+                    championshipId={championship?._id}
+                    rounds={rounds}
+                    cupData={cupData}
+                    copaAnalysis={copaAnalysis}
+                />;
             case 'restricted':
                 return <SanctionedCaptainsPanel />;
             case 'copa':
-                return <CopaPanel cupData={cupData} loading={loadingCup} championship={championship} />;
+                return <CopaPanel cupData={cupData} loading={loadingCup} championship={championship} onMatchClick={handleMatchClick} />;
             case 'calendar':
                 return <CalendarPanel allRounds={allRounds} h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} onMatchClick={handleMatchClick} />;
             case 'hall_of_fame':
