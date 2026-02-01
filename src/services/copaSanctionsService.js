@@ -220,11 +220,15 @@ export const CopaSanctionsService = {
                     const awayL = await getInternalLineup(championshipId, awayId, effectiveRoundId);
                     const awayPlayers = CopaSanctionsService._extractLineup(awayL);
 
-                    // A. Update Captains History (Include leg info in name/round if needed)
+                    // A. Update Captains History
                     CopaSanctionsService._recordCaptain(result, homeId, match.home.team.name, homePlayers, `${roundNum}.${legNum}`);
                     CopaSanctionsService._recordCaptain(result, awayId, match.away.team.name, awayPlayers, `${roundNum}.${legNum}`);
 
-                    // B. Round Sanctions (Repetitions, Same Club)
+                    // B. Store Lineups for UI detail view
+                    CopaSanctionsService._recordLineup(result, homeId, match.home.team.name, homePlayers, roundNum, CopaSanctionsService._sumLineup(homePlayers));
+                    CopaSanctionsService._recordLineup(result, awayId, match.away.team.name, awayPlayers, roundNum, CopaSanctionsService._sumLineup(awayPlayers));
+
+                    // C. Round Sanctions (Repetitions, Same Club)
                     const roundSanctions = [];
                     CopaSanctionsService._checkMatchupRepetitions({ team: match.home.team, lineup: homePlayers }, { team: match.away.team, lineup: awayPlayers }, roundSanctions, roundNum);
                     CopaSanctionsService._checkSameClubSanction({ team: match.home.team, lineup: homePlayers }, roundSanctions, roundNum);
@@ -354,6 +358,21 @@ export const CopaSanctionsService = {
             const entry = { round: roundNum, player: playerName, warning: false, alert: false };
             result.teamStats[teamId].captainHistory.push(entry);
             result.captainHistory[teamId].captainHistory.push(entry);
+        }
+    },
+
+    _recordLineup(result, teamId, teamName, players, roundNum, score) {
+        if (!result.teamStats[teamId]) {
+            result.teamStats[teamId] = { id: teamId, name: teamName, total: 0, breakdown: [], captainHistory: [] };
+        }
+        const stats = result.teamStats[teamId];
+        // Record the most recent lineup found (highest round number)
+        if (!stats.lastMatchData || roundNum >= stats.lastMatchData.round) {
+            stats.lastMatchData = {
+                round: roundNum,
+                score: score,
+                lineup: players
+            };
         }
     },
 

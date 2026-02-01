@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import WelcomeScreen from './components/WelcomeScreen';
 import { TournamentProvider } from './context/TournamentContext';
+import { apiCache } from './utils/apiCache';
 import './App.css';
 
 function App() {
@@ -12,6 +13,9 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Maintenance: prune expired/old cache entries on startup
+    apiCache.prune();
+
     getChampionships()
       .then(data => {
         const list = data.data || data.championships || [];

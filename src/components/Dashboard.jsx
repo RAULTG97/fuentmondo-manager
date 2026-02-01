@@ -379,6 +379,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                         allRounds={allRounds}
                         selectedRoundId={actualRoundIdForAPI}
                         currentRoundNumber={currentRoundNumber}
+                        cupData={cupData}
+                        copaAnalysis={copaAnalysis}
                         onClose={() => setSelectedDetailTeam(null)}
                     />
                 )}

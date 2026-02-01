@@ -119,6 +119,9 @@ export const useTournamentData = (activeTab) => {
                     const latestPlayed = rList.find(r => r.date && new Date(r.date) < now);
                     const initialRoundId = latestPlayed ? latestPlayed._id : (rList[0]?._id || null);
                     setSelectedRoundId(initialRoundId);
+
+                    const initialRoundNum = latestPlayed ? latestPlayed.number : (rList[0]?.number || 1);
+                    setCurrentRoundNumber(initialRoundNum);
                 }
             } catch (err) {
                 console.error("[FATAL] Failed to load rounds:", err);

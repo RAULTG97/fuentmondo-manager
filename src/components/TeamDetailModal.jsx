@@ -4,12 +4,13 @@ import { getTeamShield } from '../utils/assets';
 import SoccerPitch from './SoccerPitch';
 import './TeamDetailModal.css';
 
-const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, rounds, allRounds, selectedRoundId, currentRoundNumber, onClose }) => {
+const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, rounds, allRounds, selectedRoundId, currentRoundNumber, cupData, copaAnalysis, onClose }) => {
     const [expandedSections, setExpandedSections] = useState({
         lineup: false,
         nextOpponent: false,
         discipline: false,
-        captains: false
+        captains: false,
+        cupPath: true
     });
 
     if (!team) return null;
@@ -31,10 +32,14 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         teamId: team.id || team._id
     }), [team]);
 
-    // Memoize h2h stats lookup
-    const fullStats = React.useMemo(() =>
-        h2hStandings.find(t => t.id === teamId) || team
-        , [h2hStandings, teamId, team]);
+    // Memoize h2h stats lookup with name fallback (crucial for Copa)
+    const fullStats = React.useMemo(() => {
+        let t = h2hStandings.find(st => st.id === teamId);
+        if (!t && teamName) t = h2hStandings.find(st => st.name === teamName);
+        return t || team;
+    }, [h2hStandings, teamId, teamName, team]);
+
+    const finalTeamId = fullStats?.id || fullStats?._id || teamId;
 
     // Next Opponent Logic
     const nextMatchData = React.useMemo(() => {
@@ -76,13 +81,19 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
 
     // Retrieve last match data directly from the enriched team object
     const { lastLineup, lastScore, lastRoundNum } = React.useMemo(() => {
-        const lastMatchData = fullStats.lastMatchData;
+        const isCopa = championship?.type === 'copa';
+        // Primary source for Copa: copaAnalysis. secondary source: fullStats
+        const teamCopaStats = isCopa && (copaAnalysis?.teamStats?.[finalTeamId] ||
+            Object.values(copaAnalysis?.teamStats || {}).find(s => s.name === teamName));
+
+        const lastMatchData = (isCopa && teamCopaStats?.lastMatchData) || fullStats.lastMatchData;
+
         return {
             lastLineup: lastMatchData?.lineup || [],
             lastScore: lastMatchData?.score || 0,
             lastRoundNum: lastMatchData?.round || '--'
         };
-    }, [fullStats.lastMatchData]);
+    }, [championship?.type, copaAnalysis, finalTeamId, teamName, fullStats.lastMatchData]);
 
     const { totalPts, totalGen, position } = React.useMemo(() => ({
         totalPts: fullStats.points + (fullStats.hist_pts || 0),
@@ -91,6 +102,119 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
     }), [fullStats, h2hStandings, teamId]);
 
     const last5Matches = (fullStats.matchHistory || []).slice(0, 5);
+
+    const getRoundTitle = (num) => {
+        switch (num) {
+            case 1: return '1/32 Final';
+            case 2: return '1/16 Final';
+            case 3: return 'Octavos';
+            case 4: return 'Cuartos';
+            case 5: return 'Semifinales';
+            case 6: return 'Final';
+            default: return `Ronda ${num}`;
+        }
+    };
+
+    const cupPath = React.useMemo(() => {
+        if (championship?.type !== 'copa' || !cupData) return null;
+        const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
+        const activeRounds = [...rawRounds]
+            .filter(r => r.matches && r.matches.length > 0)
+            .sort((a, b) => a.number - b.number);
+
+        if (activeRounds.length === 0) return null;
+
+        let startRoundIdx = -1;
+        let startMatchIdx = -1;
+        for (let i = 0; i < activeRounds.length; i++) {
+            const mIdx = activeRounds[i].matches.findIndex(m =>
+                m.home?.team?.name === teamName || m.away?.team?.name === teamName
+            );
+            if (mIdx !== -1) {
+                startRoundIdx = i;
+                startMatchIdx = mIdx;
+                break;
+            }
+        }
+        if (startMatchIdx === -1) return null;
+
+        const path = [];
+        const numRounds = activeRounds.length;
+
+        for (let k = 0; k < (numRounds - startRoundIdx); k++) {
+            const roundIdx = startRoundIdx + k;
+            const round = activeRounds[roundIdx];
+            const matchIdx = Math.floor(startMatchIdx / Math.pow(2, k));
+            const match = round.matches[matchIdx];
+
+            if (!match) break;
+
+            const isHome = match.home?.team?.name === teamName;
+            const isAway = match.away?.team?.name === teamName;
+
+            const rivalMatchIdx = matchIdx ^ 1;
+            const possibleRivals = [];
+            const factor = Math.pow(2, k);
+            const startRange = rivalMatchIdx * factor;
+            const endRange = startRange + factor;
+
+            for (let j = startRange; j < endRange; j++) {
+                const baseMatch = activeRounds[startRoundIdx].matches[j];
+                if (baseMatch) {
+                    if (baseMatch.home?.team?.name) possibleRivals.push(baseMatch.home.team.name);
+                    if (baseMatch.away?.team?.name) possibleRivals.push(baseMatch.away.team.name);
+                }
+            }
+
+            path.push({
+                roundNumber: round.number,
+                roundName: getRoundTitle(round.number),
+                currentRival: isHome ? (match.away?.team?.name || 'LIBRE') : (isAway ? (match.home?.team?.name || 'LIBRE') : null),
+                possibleRivals: Array.from(new Set(possibleRivals)).filter(r => r !== teamName),
+                isCurrent: (round.number === currentRoundNum),
+                isConfirmed: (isHome || isAway)
+            });
+        }
+        return path;
+    }, [championship?.type, cupData, teamName, currentRoundNum]);
+
+    const isCopa = championship?.type === 'copa';
+    const teamCopaStats = isCopa && (copaAnalysis?.teamStats?.[finalTeamId] ||
+        Object.values(copaAnalysis?.teamStats || {}).find(s => s.name === teamName));
+
+    const teamStatus = React.useMemo(() => {
+        if (!isCopa || !cupData) return null;
+        const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
+
+        // Find all matches of this team
+        const allMyMatches = [];
+        rawRounds.forEach(r => {
+            const m = (r.matches || []).find(match => match.home?.team?.name === teamName || match.away?.team?.name === teamName);
+            if (m) allMyMatches.push({ roundNum: r.number, match: m });
+        });
+
+        if (allMyMatches.length === 0) return 'Desconocido';
+
+        // Sort by round number descending to get the latest match
+        allMyMatches.sort((a, b) => b.roundNum - a.roundNum);
+        const lastMatchInfo = allMyMatches[0];
+        const m = lastMatchInfo.match;
+        const isFinished = m.status === 'finished' || (m.homeScore !== undefined && m.awayScore !== undefined && m.status !== 'live');
+
+        if (!isFinished) return 'Sigue en juego';
+
+        // Check if won last match
+        const isHome = m.home?.team?.name === teamName;
+        const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
+
+        if (won) {
+            // If it was the final, they are champion
+            if (lastMatchInfo.roundNum === 6) return 'Campeón';
+            return 'Sigue en juego';
+        } else {
+            return 'Eliminado';
+        }
+    }, [isCopa, cupData, teamName]);
 
     return (
         <div className="modal-overlay fade-in" onClick={onClose}>
@@ -106,22 +230,40 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                         <div className="header-title-box">
                             <h2 className="team-detail-name">{teamName}</h2>
                             <div className="header-meta">
-                                <span className={`rank-badge pos-${position}`}>Posición #{position || '--'}</span>
+                                {!isCopa && <span className={`rank-badge pos-${position}`}>Posición #{position || '--'}</span>}
                                 <span className="league-badge">
-                                    {championship?.type === 'copa' ? 'Copa Piraña' : 'Liga Fuentmondo'}
+                                    {isCopa ? 'Copa Piraña' : 'Liga Fuentmondo'}
                                 </span>
                             </div>
                         </div>
                     </div>
                     <div className="header-stats-row">
-                        <div className="stat-group">
-                            <span className="label">PUNTOS TOTAL</span>
-                            <span className="value">{totalPts}</span>
-                        </div>
-                        <div className="stat-group accent">
-                            <span className="label">PUNTOS GENERAL</span>
-                            <span className="value">{totalGen}</span>
-                        </div>
+                        {!isCopa && (
+                            <>
+                                <div className="stat-group">
+                                    <span className="label">PUNTOS TOTAL</span>
+                                    <span className="value">{totalPts}</span>
+                                </div>
+                                <div className="stat-group accent">
+                                    <span className="label">PUNTOS GENERAL</span>
+                                    <span className="value">{totalGen}</span>
+                                </div>
+                            </>
+                        )}
+                        {isCopa && (
+                            <>
+                                <div className="stat-group">
+                                    <span className="label">ESTADO COPA</span>
+                                    <span className="value" style={{ color: teamStatus === 'Eliminado' ? '#ef4444' : '#10b981' }}>
+                                        {teamStatus || '---'}
+                                    </span>
+                                </div>
+                                <div className="stat-group">
+                                    <span className="label">SANCIONES TOTALES</span>
+                                    <span className="value" style={{ color: '#ef4444' }}>{teamCopaStats?.total || 0}€</span>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -130,15 +272,14 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                     <div className="detail-grid-two-cols">
                         <div className="detail-section-static">
                             <div className="section-static-header">
-                                {championship?.type === 'copa' ? <Activity size={18} /> : <Trophy size={18} />}
-                                <span>{championship?.type === 'copa' ? 'Estadísticas Copa' : 'Resumen de Liga'}</span>
+                                {isCopa ? <Activity size={18} /> : <Trophy size={18} />}
+                                <span>{isCopa ? 'Estadísticas Copa' : 'Resumen de Liga'}</span>
                             </div>
                             <div className="static-content-inner stats-grid-mini">
-                                {championship?.type === 'copa' ? (
+                                {isCopa ? (
                                     <>
-                                        <div className="stat-row"><span>Estado</span> <strong>Participante</strong></div>
-                                        <div className="stat-row"><span>Puntos Global</span> <strong>{totalPts} pts</strong></div>
-                                        <div className="stat-row"><span>Sanciones</span> <strong style={{ color: '#fca5a5' }}>{fullStats.total || 0}€</strong></div>
+                                        <div className="stat-row"><span>Estado</span> <strong>{teamStatus || 'Cargando...'}</strong></div>
+                                        <div className="stat-row"><span>Sanciones</span> <strong style={{ color: '#fca5a5' }}>{teamCopaStats?.total || 0}€</strong></div>
                                     </>
                                 ) : (
                                     <>
@@ -158,18 +299,19 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                             </div>
                             <div className="static-content-inner form-container-v2">
                                 <div className="form-shields-row">
-                                    {last5Matches.map((m, i) => (
+                                    {(isCopa ? [] : last5Matches).map((m, i) => (
                                         <div key={i} className="form-shield-item">
                                             <img src={getTeamShield(m.opponentName)} alt={m.opponentName} className="history-shield" />
                                         </div>
                                     ))}
                                 </div>
                                 <div className="form-results-row">
-                                    {last5Matches.map((m, i) => (
+                                    {(isCopa ? [] : last5Matches).map((m, i) => (
                                         <div key={i} className={`form-symbol-v2 result-${m.result}`}>
                                             {m.result}
                                         </div>
                                     ))}
+                                    {isCopa && <p className="no-data-text" style={{ fontSize: '0.8rem', opacity: 0.5 }}>Actualización al finalizar ronda</p>}
                                 </div>
                             </div>
                         </div>
@@ -180,7 +322,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                         <div className="section-trigger" onClick={() => toggleSection('lineup')}>
                             <div className="label-with-icon">
                                 <User size={18} />
-                                <span>Alineación {championship?.type === 'copa' ? `Ronda ${lastRoundNum}` : `Jornada J${lastRoundNum}`}</span>
+                                <span>{isCopa ? `Alineación Ronda ${lastRoundNum}` : `Alineación Jornada J${lastRoundNum}`}</span>
                             </div>
                             <div className="trigger-right">
                                 {expandedSections.lineup ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -253,37 +395,94 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                         </div>
                     )}
 
-                    {/* 4. DISCIPLINA & HISTORIAL CAPITANES (SIDE BY SIDE COLLAPSIBLE) */}
-                    <div className="detail-grid-two-cols">
-                        <div className="detail-section-collapsible">
-                            <div className="section-trigger" onClick={() => toggleSection('discipline')}>
+                    {/* 3.5 CAMINO A LA COPA (NEW SECTION) */}
+                    {cupPath && (
+                        <div className="detail-section-collapsible cup-path-section">
+                            <div className="section-trigger" onClick={() => toggleSection('cupPath')}>
                                 <div className="label-with-icon">
-                                    <AlertTriangle size={18} />
-                                    <span>Disciplina</span>
+                                    <Trophy size={18} />
+                                    <span>El Camino a la Copa</span>
                                 </div>
-                                {expandedSections.discipline ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                <div className="trigger-right">
+                                    {expandedSections.cupPath ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                </div>
                             </div>
-                            {expandedSections.discipline && (
-                                <div className="section-content-inner sanctions-list-mini">
-                                    <div className="sub-header-mini">Sanciones Activas</div>
-                                    {activeSanctions.length > 0 ? activeSanctions.map((s, i) => (
-                                        <div key={i} className="sanction-tag">
-                                            <strong>{s.player}</strong>: Fuera hasta J{s.outTeamUntil}
-                                        </div>
-                                    )) : <p className="empty-text">Sin sanciones activas</p>}
-
-                                    <div className="sub-header-mini mt-2">Infracciones</div>
-                                    <div className="inf-scroll-box">
-                                        {infractions.length > 0 ? infractions.map((inf, i) => (
-                                            <div key={i} className="inf-mini-line">
-                                                <span>J{inf.round} - {inf.type}</span>
-                                                <span className="cost">{inf.cost}€</span>
+                            {expandedSections.cupPath && (
+                                <div className="section-content-inner animate-slide-down">
+                                    <div className="cup-path-timeline">
+                                        {cupPath.map((r, i) => (
+                                            <div key={i} className={`cup-path-round ${r.isCurrent ? 'current' : ''}`}>
+                                                <div className="round-marker"></div>
+                                                <div className="round-details">
+                                                    <div className="round-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span className="round-name">{r.roundName}</span>
+                                                        {r.isCurrent && <span className="current-badge">ACTUAL</span>}
+                                                    </div>
+                                                    <div className="rivals-container">
+                                                        {r.currentRival ? (
+                                                            <div className="confirmed-rival">
+                                                                <span className="rival-label">Rival:</span>
+                                                                <div className="rival-chip">
+                                                                    <img src={getTeamShield(r.currentRival)} alt="" className="micro-shield" />
+                                                                    <span>{r.currentRival}</span>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="possible-rivals">
+                                                                <span className="rival-label">Posibles Rivales:</span>
+                                                                <div className="rival-grid-mini">
+                                                                    {r.possibleRivals.map((pr, idx) => (
+                                                                        <div key={idx} className="rival-chip mini" title={pr}>
+                                                                            <img src={getTeamShield(pr)} alt="" className="micro-shield" />
+                                                                            <span className="hide-mobile">{pr}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        )) : <p className="empty-text">Sin infracciones.</p>}
+                                        ))}
                                     </div>
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* 4. DISCIPLINA & HISTORIAL CAPITANES (SIDE BY SIDE COLLAPSIBLE) */}
+                    <div className="detail-grid-two-cols">
+                        {!isCopa && (
+                            <div className="detail-section-collapsible">
+                                <div className="section-trigger" onClick={() => toggleSection('discipline')}>
+                                    <div className="label-with-icon">
+                                        <AlertTriangle size={18} />
+                                        <span>Disciplina</span>
+                                    </div>
+                                    {expandedSections.discipline ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                </div>
+                                {expandedSections.discipline && (
+                                    <div className="section-content-inner sanctions-list-mini">
+                                        <div className="sub-header-mini">Sanciones Activas</div>
+                                        {activeSanctions.length > 0 ? activeSanctions.map((s, i) => (
+                                            <div key={i} className="sanction-tag">
+                                                <strong>{s.player}</strong>: Fuera hasta J{s.outTeamUntil}
+                                            </div>
+                                        )) : <p className="empty-text">Sin sanciones activas</p>}
+
+                                        <div className="sub-header-mini mt-2">Infracciones</div>
+                                        <div className="inf-scroll-box">
+                                            {infractions.length > 0 ? infractions.map((inf, i) => (
+                                                <div key={i} className="inf-mini-line">
+                                                    <span>J{inf.round} - {inf.type}</span>
+                                                    <span className="cost">{inf.cost}€</span>
+                                                </div>
+                                            )) : <p className="empty-text">Sin infracciones.</p>}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="detail-section-collapsible">
                             <div className="section-trigger" onClick={() => toggleSection('captains')}>
@@ -296,16 +495,18 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                             {expandedSections.captains && (
                                 <div className="section-content-inner captains-history-box">
                                     <div className="captains-list-scroll">
-                                        {(stats.captainHistory || []).slice().reverse().map((h, i) => (
+                                        {((isCopa ? teamCopaStats?.captainHistory : stats.captainHistory) || []).slice().reverse().map((h, i) => (
                                             <div key={i} className={`cap-history-row ${h.alert ? 'alert' : ''}`}>
                                                 <span className="round">
-                                                    {championship?.type === 'copa' ? `R${h.round}` : `J${h.round}`}
+                                                    {isCopa ? `R${h.round}` : `J${h.round}`}
                                                 </span>
                                                 <span className="name">{h.player}</span>
-                                                <span className="count">x{h.count}</span>
+                                                <span className="count">
+                                                    {isCopa ? (h.alert ? '⚠️' : '') : `x${h.count}`}
+                                                </span>
                                             </div>
                                         ))}
-                                        {(!stats.captainHistory || stats.captainHistory.length === 0) && <p className="empty-text">Sin historial.</p>}
+                                        {!((isCopa ? teamCopaStats?.captainHistory : stats.captainHistory) || []).length && <p className="empty-text">Sin historial.</p>}
                                     </div>
                                 </div>
                             )}

@@ -60,32 +60,37 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
                     Participantes Copa Piraña
                 </motion.h3>
                 <div className="teams-grid">
-                    {participantsList.map((name, idx) => (
-                        <motion.div
-                            key={idx}
-                            variants={itemVariants}
-                            initial="hidden"
-                            animate="visible"
-                            className="team-card"
-                            whileHover={{
-                                scale: 1.02,
-                                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                borderColor: 'var(--primary)'
-                            }}
-                        >
-                            <div className="team-shield-container">
-                                <img
-                                    src={getTeamShield(name)}
-                                    alt={name}
-                                    className="team-card-shield"
-                                    loading="lazy"
-                                />
-                            </div>
-                            <div className="team-card-info">
-                                <h3 className="team-card-name">{name}</h3>
-                            </div>
-                        </motion.div>
-                    ))}
+                    {participantsList.map((name, idx) => {
+                        const teamObj = h2hStandings?.find(t => t.name === name) || { name };
+                        return (
+                            <motion.div
+                                key={idx}
+                                variants={itemVariants}
+                                initial="hidden"
+                                animate="visible"
+                                className="team-card clickable"
+                                onClick={() => onTeamClick(teamObj)}
+                                whileHover={{
+                                    scale: 1.02,
+                                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                                    borderColor: 'var(--primary)'
+                                }}
+                                whileTap={{ scale: 0.98 }}
+                            >
+                                <div className="team-shield-container">
+                                    <img
+                                        src={getTeamShield(name)}
+                                        alt={name}
+                                        className="team-card-shield"
+                                        loading="lazy"
+                                    />
+                                </div>
+                                <div className="team-card-info">
+                                    <h3 className="team-card-name">{name}</h3>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                 </div>
             </motion.div>
         );
