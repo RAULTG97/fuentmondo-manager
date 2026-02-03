@@ -1,0 +1,40 @@
+name: Check Futmondo Updates
+
+on:
+  schedule:
+    # Runs every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to update the cache/state files if we commit back?
+                      # Wait, using Firestore so no repo commit needed.
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install firebase-admin axios
+
+      - name: Run Update Check
+        env:
+          # Your Firebase Service Account JSON (from Secrets)
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          # API Key for Futmondo (from Secrets or Env)
+          # Assuming you put VITE_API_KEY in repo secrets too as FUTMONDO_API_KEY
+          # OR hardcode if it's public key (less secure but ok for now)
+          # Better to use a secret.
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }} 
+          # Or if it's in .env, we can't read .env easily here.
+          # We'll expect VITE_API_KEY in secrets.
+        run: node scripts/check-updates.js

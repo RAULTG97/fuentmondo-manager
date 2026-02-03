@@ -1,3 +1,10 @@
+// Import Firebase Messaging logic (merged worker)
+try {
+    importScripts('./firebase-messaging-sw.js');
+} catch (e) {
+    console.error("Failed to import firebase-messaging-sw.js into sw.js", e);
+}
+
 const CACHE_NAME = 'fuentmondo-v1';
 const ASSETS = [
     './',

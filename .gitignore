@@ -31,3 +31,7 @@ whatsapp-bot/.wwebjs_auth/
 whatsapp-bot/.wwebjs_cache/
 whatsapp-bot/node_modules/
 
+
+# Env
+.env
+public/firebase-config.js
