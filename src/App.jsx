@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import WelcomeScreen from './components/WelcomeScreen';
 import { TournamentProvider } from './context/TournamentContext';
 import { apiCache } from './utils/apiCache';
+import { FirebaseService } from './services/firebaseService';
 import './App.css';
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
   // Prune cache on mount (legacy maintenance)
   useEffect(() => {
     apiCache.prune();
+    FirebaseService.init();
   }, []);
 
   const { data: championshipsData, isLoading, error } = useQuery({
