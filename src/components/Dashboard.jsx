@@ -29,6 +29,8 @@ import LineupViewer from './LineupViewer';
 import MatchDetail from './MatchDetail';
 import HallOfFame from './HallOfFame';
 import Loader from './Loader';
+import BottomNav from './BottomNav';
+import CommandPalette from './CommandPalette';
 
 import TableSkeleton from './skeletons/TableSkeleton';
 import CardSkeleton from './skeletons/CardSkeleton';
@@ -53,6 +55,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     const [selectedMatchRoundId, setSelectedMatchRoundId] = useState(null);
     const [selectedDetailTeam, setSelectedDetailTeam] = useState(null);
     const [expandedVuelta, setExpandedVuelta] = useState(null); // null | 1 | 2
+    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
     // Sync championship with context
     useEffect(() => {
@@ -68,6 +71,18 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
 
     // Handle data fetching side effects
     useTournamentData(activeTab);
+
+    // Global shortcut for Command Palette
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                setIsCommandPaletteOpen(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const currentRoundObj = rounds.find(r => {
         if (typeof selectedRoundId === 'number') return r.number === selectedRoundId;
@@ -178,12 +193,13 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                         <td className="sticky-col-1" style={{ fontWeight: 800 }}>{idx + 1}</td>
                                         <td className="team-cell sticky-col-2">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <img
+                                                <motion.img
+                                                    layoutId={`shield-${team.id || team.name}`}
                                                     src={getTeamShield(team.name)}
                                                     alt=""
                                                     loading="lazy"
                                                     onClick={() => setSelectedDetailTeam(team)}
-                                                    style={{ width: '24px', height: '24px', objectFit: 'contain', cursor: 'pointer' }}
+                                                    style={{ width: '28px', height: '28px', objectFit: 'contain', cursor: 'pointer' }}
                                                 />
                                                 <span
                                                     className="clickable-team"
@@ -273,14 +289,6 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
             />
 
             <main className="dashboard-content">
-                {/* Mobile Branding Bar (Persistent on small screens) */}
-                <div className="mobile-branding-bar">
-                    <div className="logo-section">
-                        <img src={APP_LOGO} alt="Logo" className="mobile-logo" />
-                        <h1 className="mobile-title">Fuentmondo</h1>
-                    </div>
-                </div>
-
                 <header className="dashboard-header animate-in">
                     <div className="header-info">
                         <div className="header-title-row">
@@ -353,6 +361,8 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 </AnimatePresence>
             </main>
 
+            <BottomNav activeTab={activeTab} onTabChange={setActiveTab} championship={championship} />
+
             {/* Modals & Overlays */}
             <AnimatePresence>
                 {selectedUserTeam && (
@@ -385,6 +395,23 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                     />
                 )}
             </AnimatePresence>
+
+            <CommandPalette
+                isOpen={isCommandPaletteOpen}
+                onClose={() => setIsCommandPaletteOpen(false)}
+                onNavigate={setActiveTab}
+                teams={h2hStandings}
+                onSelectTeam={(team) => {
+                    setSelectedDetailTeam(team);
+                    // If team is in standings, maybe switch to that tab if not already?
+                    // Actually, just opening the modal is better UX.
+                }}
+                rounds={championship?.type === 'copa' ? rounds : allRounds}
+                onSelectRound={(roundNum) => {
+                    setSelectedRoundId(roundNum);
+                    setActiveTab('matchups');
+                }}
+            />
 
             {calculationProgress > 0 && calculationProgress < 100 && (
                 <div style={{

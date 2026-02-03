@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight, Euro, Search, Calculator, Loader2 } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 import { CopaSanctionsService } from '../services/copaSanctionsService';
@@ -7,12 +7,16 @@ function SanctionsPanel({ sanctionsData, isCopa, rounds, championshipId, cupData
     const [expandedTeam, setExpandedTeam] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Copa State
+    // WhatsApp State (Mantenemos por si se usa en subcomponentes o lógica futura)
+    const [sendingReport, setSendingReport] = useState(false);
+    const [reportStatus, setReportStatus] = useState(null); // 'success' | 'error'
+
+    // Copa State - RESTAURADO
     const [loadingCopa, setLoadingCopa] = useState(false);
     const [copaResult, setCopaResult] = useState(null);
 
     // Auto-fetch for Copa
-    useState(() => {
+    useEffect(() => {
         if (isCopa && championshipId && cupData && !copaResult && !loadingCopa) {
             setLoadingCopa(true);
             CopaSanctionsService.scanCopaAndCalculate(championshipId, cupData)

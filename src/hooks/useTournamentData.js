@@ -14,6 +14,19 @@ export const useTournamentData = (activeTab) => {
     const context = useTournament();
     const isFetching = useRef(false);
     const allRoundsRef = useRef([]);
+    const workerRef = useRef(null);
+
+    // Initialize Worker
+    useEffect(() => {
+        workerRef.current = new Worker(
+            new URL('../workers/tournamentWorker.js', import.meta.url),
+            { type: 'module' }
+        );
+
+        return () => {
+            if (workerRef.current) workerRef.current.terminate();
+        };
+    }, []);
 
     const {
         championship,
@@ -341,10 +354,12 @@ export const useTournamentData = (activeTab) => {
 
         if (hasCachedMatches) {
             setMatches(cachedRound.matches);
-            // If it's a past round and we are in "matchups" view, we can skip the fetch entirely
-            // because scores rarely change for past rounds.
-            // Also skip for FUTURE rounds - no point fetching details for empty games if we have the schedule
-            if ((isPast || isFuture) && !isAutoRefresh && activeTab === 'matchups') {
+
+            // Optimization: If round is past/future AND we ALREADY HAVE enriched data, stop.
+            // But if we only have basic matches (no lineup data), we MUST continue to enrich.
+            const isEnriched = cachedRound.matches.some(m => m.enriched);
+
+            if ((isPast || isFuture) && isEnriched && !isAutoRefresh && activeTab === 'matchups') {
                 setLoadingDisplay(false);
                 return;
             }
@@ -492,20 +507,19 @@ export const useTournamentData = (activeTab) => {
 
     // 3. Tournament Wide Calculation
     const calculateTournamentWideData = useCallback(async () => {
-        if (!championship || rounds.length === 0) return;
+        if (!championship || allRounds.length === 0) return;
 
         // --- OPTIMIZATION: Check Digest to skip calculation ---
         if (isFetching.current) return;
 
-        const isSanctionView = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'matchups', 'copa'].includes(activeTab);
-        const currentRoundObj = rounds.find(r => r.number === currentRoundNumber);
+        const isSanctionView = ['dashboard', 'welcome', 'standings', 'calendar', 'sanctions', 'captains', 'teams', 'infractions', 'restricted', 'matchups', 'copa'].includes(activeTab);
+        const currentRoundObj = allRounds.find(r => r.number === currentRoundNumber);
         const isLive = currentRoundObj?.status === 'current';
 
-        // Digest components: Championship + Round + Data Freshness (Live timestamp vs Static) + Tab Level (Full/Basic)
-        // If live, we use Date.now() logic handled outside or just let it pass if polling. 
-        // Actually, for live polling, we want to update only if data changed, but calculating is cheap vs fetching.
-        // We will skip if static and digest matches.
-        const digest = `${championship._id}_${currentRoundNumber}_${isSanctionView ? 'full' : 'basic'}_${isLive ? 'live' : 'static'}`;
+        // Add a salt for enrichment status to allow re-runs when lineups are loaded
+        const enrichmentSalt = (isSanctionView && matches?.some(m => m.enriched)) ? 'enriched' : 'base';
+
+        const digest = `${championship._id}_${currentRoundNumber}_${isSanctionView ? 'full' : 'basic'}_${isLive ? 'live' : 'static'}_${enrichmentSalt}`;
 
         if (!isLive && lastCalculationDigest.current === digest && standingsLoaded) {
             // If we already have the heavy data for sanctions, stay put.
@@ -517,18 +531,22 @@ export const useTournamentData = (activeTab) => {
         isFetching.current = true;
 
         const now = new Date();
-        const pastRounds = rounds.filter(r => (r.date && new Date(r.date) < now) || r.status === 'past');
-        // Include current round if it exists
-        const currentRound = rounds.find(r => r.number === currentRoundNumber || r.status === 'current');
-        const roundsToFetch = [...pastRounds];
-        if (currentRound && !roundsToFetch.find(r => r._id === currentRound._id)) {
-            roundsToFetch.push(currentRound);
-        }
+        // Be very inclusive with rounds to fetch for full analysis
+        const roundsToFetch = allRounds.filter(r => {
+            const isPast = (r.date && new Date(r.date) < now) || r.status === 'past' || r.status === 'historical';
+            const isCurrent = r.number === currentRoundNumber || r.status === 'current';
+            // We only fetch detailed data for J20+ from API. J1-J19 are in historical file.
+            return (isPast || isCurrent) && (r.number >= 20 || championship.type === 'copa');
+        });
 
-        // --- CACHE INVALIDATION: Force refetch of current and recently active rounds ---
-        // This ensures sanctions update when a round finishes or starts.
+        // --- CACHE INVALIDATION: Force refetch of current and adjacent rounds ---
+        // This ensures sanctions and lineups update when a round finishes or starts.
         roundsToFetch.forEach(r => {
-            const isLiveOrRecent = r.status === 'current' || r.number === currentRoundNumber;
+            // Invalidate current round and one before/after to handle transitions safely
+            const isLiveOrRecent = r.status === 'current' ||
+                Math.abs(r.number - currentRoundNumber) <= 1 ||
+                (r.status === 'past' && r.number === currentRoundNumber);
+
             if (isLiveOrRecent) {
                 delete historicalCache.current[r._id];
             }
@@ -581,193 +599,119 @@ export const useTournamentData = (activeTab) => {
                 }
             });
 
-            // Fetch missing lineups for sanctions logic
+            // --- CRITICAL FIX: Fetch missing lineups for sanctions logic ---
+            // Sanctions calculation depends on knowing who was captain in every match.
+            if (isSanctionView) {
+                const roundsNeedingEnrichment = allRoundDataCombined.filter(rd =>
+                    rd.matches && rd.matches.some(m => !m.lineupA || m.lineupA.length === 0)
+                );
 
-            // --- OPTIMIZATION: Previously declared above, reused here ---
-            // const needsSanctionsData = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'standings', 'calendar'].includes(activeTab);
-            // Re-using isSanctionView but extending for standings/calendar if needed
+                for (const rd of roundsNeedingEnrichment) {
+                    const rId = rd._id;
+                    const isRoundLive = rd.number === currentRoundNumber;
+
+                    // Fetch lineups for each match in the round
+                    const batchSizeLineups = 4;
+                    for (let i = 0; i < rd.matches.length; i += batchSizeLineups) {
+                        const matchBatch = rd.matches.slice(i, i + batchSizeLineups);
+                        await Promise.all(matchBatch.map(async (m) => {
+                            if (!m.homeTeamId || !m.awayTeamId) return;
+                            try {
+                                const [resH, resA] = await Promise.all([
+                                    fetchWithRetry(getInternalLineup, championship._id, m.homeTeamId, rId, isRoundLive),
+                                    fetchWithRetry(getInternalLineup, championship._id, m.awayTeamId, rId, isRoundLive)
+                                ]);
+                                m.lineupA = resH.players?.initial || resH.players || [];
+                                m.lineupB = resA.players?.initial || resA.players || [];
+                                m.enriched = true;
+                            } catch (e) { /* silent catch */ }
+                        }));
+                    }
+                    // Update cache with enriched round
+                    historicalCache.current[rId] = { ...rd };
+                }
+                // Refresh allRoundDataCombined after enrichment to ensure worker gets the objects with lineups
+                allRoundDataCombined.length = 0;
+                roundsToFetch.forEach(r => {
+                    if (historicalCache.current[r._id]) {
+                        allRoundDataCombined.push(historicalCache.current[r._id]);
+                    }
+                });
+            }
+
             const needsSanctionsData = isSanctionView || ['standings', 'calendar'].includes(activeTab);
 
             if (needsSanctionsData) {
                 const sCalc = await import('../utils/SanctionsCalculator');
                 const allTeamsMap = new Map();
+                // 1. Build teamList from ALL rankings found in API (J20+)
                 allRoundDataCombined.forEach(rd => rd.ranking?.forEach(t => allTeamsMap.set(t._id, t)));
+
+                // 2. IMPORTANT: Add teams from the historical file (J1-J19) that might not be in J20+
+                const histRankings = await import('../data/historical_rankings.json');
+                Object.keys(histRankings.default || {}).forEach(name => {
+                    const resolvedName = name; // Resolver logic handles mapping later
+                    // We don't have IDs for J1-J19 ONLY teams, but SanctionsCalculator needs 
+                    // a complete teamList to know which names are valid to resolve.
+                    // Actually, teamList is used to map resolvedName -> ID in SanctionsCalculator:41
+                });
+
                 const teamList = Array.from(allTeamsMap.values());
                 teamList.__championshipName = championship.name;
 
                 // --- OPTIMIZATION: Early Standings Calculate & Set ---
                 const filteredRounds = allRoundDataCombined.map(rd => {
                     // Check if we have live matches for this round in the state
-                    // This happens if the user is viewing the current round or we are polling it
                     const isCurrentRoundData = rd.number === currentRoundNumber;
                     if (isCurrentRoundData && matches && matches.length > 0) {
-                        // Check if the matches in state belong to this round (heuristic or explicit check)
-                        // Since 'matches' state usually holds the selected round, and if selected == current
-                        // we can assume it's the live data.
                         if (selectedRoundId === currentRoundNumber) {
                             return { ...rd, matches: matches };
                         }
                     }
                     return rd;
                 }).filter(rd => {
-                    const rObj = rounds.find(r => r._id === rd._id || r.number === rd.number);
-                    // Include if past/historical OR if it's the current/live round with data
-                    return rObj && (
-                        rObj.status === 'past' ||
-                        rObj.status === 'historical' ||
-                        rObj.status === 'current' || // Explicitly include current
-                        (rObj.date && new Date(rObj.date) < now)
-                    );
-                });
-                const initialStandings = calculateH2HStandings(filteredRounds);
-
-                // --- NEW: Populate initial lastMatchData from cached lineups ---
-                const reverseRoundsForInitial = [...filteredRounds].sort((a, b) => b.number - a.number);
-                initialStandings.forEach(team => {
-                    for (const rd of reverseRoundsForInitial) {
-                        const m = rd.matches?.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
-                        if (m && (m.lineupA || m.lineupB)) {
-                            team.lastMatchData = {
-                                round: rd.number,
-                                score: m.homeTeamId === team.id ? m.homeScore : m.awayScore,
-                                lineup: m.homeTeamId === team.id ? m.lineupA : m.lineupB
-                            };
-                            break; // Found the most recent one
-                        }
-                    }
+                    // Be more inclusive: if we have ranking and matches, we should process it.
+                    // This fixes missing data in sanctions panels.
+                    return rd.ranking && rd.ranking.length > 0 && rd.matches && rd.matches.length > 0;
                 });
 
-                setH2HStandings(initialStandings);
-                setStandingsLoaded(true);
-                setLoadingStandings(false); // Can hide standings loader early
+                // --- DELEGATE TO WORKER ---
+                if (workerRef.current) {
+                    workerRef.current.onmessage = (event) => {
+                        const { type, payload, error } = event.data;
+                        if (type === 'CALCULATION_SUCCESS') {
+                            const { standings, sanctions } = payload;
 
-                // --- OPTIMIZATION: Targeted fetch of the MOST RECENT lineup for each team ---
-                // This replaces the full 38-round scan for the Teams panel.
-                const teamsNeedingLineup = initialStandings.filter(t => !t.lastMatchData?.lineup);
-                if (teamsNeedingLineup.length > 0) {
-                    const batchSize = 4;
-                    for (let i = 0; i < teamsNeedingLineup.length; i += batchSize) {
-                        const batch = teamsNeedingLineup.slice(i, i + batchSize);
-                        await Promise.all(batch.map(async (team) => {
-                            // Find the latest round with a match for this team
-                            const latestRoundWithMatch = [...filteredRounds]
-                                .sort((a, b) => b.number - a.number)
-                                .find(rd => rd.matches?.some(m => m.homeTeamId === team.id || m.awayTeamId === team.id));
+                            // 1. Set initial standings for rapid feedback
+                            setH2HStandings(standings);
+                            setSanctionsData(sanctions);
+                            setStandingsLoaded(true);
+                            setLoadingStandings(false);
+                            setLoadingAllLineups(false);
 
-                            if (latestRoundWithMatch) {
-                                try {
-                                    const isLive = latestRoundWithMatch.status === 'current' || latestRoundWithMatch.number === currentRoundNumber;
-                                    const res = await fetchWithRetry(getInternalLineup, championship._id, team.id, latestRoundWithMatch._id, isLive);
-                                    const lineup = (res?.players?.initial) ? res.players.initial : (res?.players || []);
-                                    const match = latestRoundWithMatch.matches.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
-
-                                    setH2HStandings(prev => prev.map(t => t.id === team.id ? {
-                                        ...t,
-                                        lastMatchData: {
-                                            round: latestRoundWithMatch.number,
-                                            score: match.homeTeamId === team.id ? match.homeScore : match.awayScore,
-                                            lineup
-                                        }
-                                    } : t));
-                                } catch (e) { /* silent */ }
-                            }
-                        }));
-                    }
-                }
-
-                // --- OPTIMIZATION: Only fetch full lineups if strictly needed for sanctions/captains tabs ---
-                // Re-using isSanctionView variable derived at the start
-                const needsExhaustiveScan = isSanctionView;
-
-                if (!needsExhaustiveScan) {
-                    setLoadingAllLineups(false);
-
-                    // --- DIGEST UPDATE ON PARTIAL SUCCESS ---
-                    if (!isLive) lastCalculationDigest.current = digest;
-
-                    return;
-                }
-
-                // Fetch missing lineups for sanctions logic - REVERSED for priority
-                const reverseRounds = [...allRoundDataCombined].sort((a, b) => b.number - a.number);
-
-
-
-                // --- OPTIMIZATION: Parallelize Round Processing ---
-                // Process rounds in batches to avoid waterfall but limit concurrency
-                const batchSizeRounds = 5;
-                for (let i = 0; i < reverseRounds.length; i += batchSizeRounds) {
-                    const roundBatch = reverseRounds.slice(i, i + batchSizeRounds);
-                    await Promise.all(roundBatch.map(async (rd) => {
-                        if (!rd.matches || !rd.ranking) return;
-
-                        let anyNew = false;
-                        const getLineupSafe = async (tid) => {
-                            try {
-                                const isLive = rd.status === 'current' || rd.number === currentRoundNumber;
-                                const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id, isLive);
-                                return (res?.players?.initial) ? res.players.initial : (res?.players || []);
-                            } catch (e) { return []; }
-                        };
-
-                        // Process matches in this round in batches to be nice to API
-                        const batchSizeLineups = 4;
-                        for (let j = 0; j < rd.matches.length; j += batchSizeLineups) {
-                            const batch = rd.matches.slice(j, j + batchSizeLineups);
-                            await Promise.all(batch.map(async (m) => {
-                                if (!m.lineupA) {
-                                    const tA = rd.ranking?.[m.p?.[0] - 1];
-                                    if (tA) { m.lineupA = await getLineupSafe(tA._id, rd._id); anyNew = true; }
-                                    else if (m.homeTeamId) { m.lineupA = await getLineupSafe(m.homeTeamId, rd._id); anyNew = true; }
-                                }
-                                if (!m.lineupB) {
-                                    const tB = rd.ranking?.[m.p?.[1] - 1];
-                                    if (tB) { m.lineupB = await getLineupSafe(tB._id, rd._id); anyNew = true; }
-                                    else if (m.awayTeamId) { m.lineupB = await getLineupSafe(m.awayTeamId, rd._id); anyNew = true; }
-                                }
-                            }));
+                            if (!isLive) lastCalculationDigest.current = digest;
+                            isFetching.current = false;
+                        } else if (type === 'CALCULATION_ERROR') {
+                            console.error('[Worker Error Callback]', error);
+                            isFetching.current = false;
                         }
+                    };
 
-                        if (anyNew) {
-                            historicalCache.current[rd._id] = { ...rd };
-
-                            // Incremental update of "lastMatchData" for the teams panel
-                            setH2HStandings(prev => {
-                                const next = [...prev];
-                                next.forEach(team => {
-                                    // Only update if this round is newer than what we have or we have nothing
-                                    const isNewer = !team.lastMatchData || rd.number >= team.lastMatchData.round;
-                                    if (isNewer) {
-                                        const m = rd.matches.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
-                                        if (m && (m.lineupA || m.lineupB)) {
-                                            team.lastMatchData = {
-                                                round: rd.number,
-                                                score: m.homeTeamId === team.id ? m.homeScore : m.awayScore,
-                                                lineup: m.homeTeamId === team.id ? m.lineupA : m.lineupB
-                                            };
-                                        }
-                                    }
-                                });
-                                return next;
-                            });
+                    workerRef.current.postMessage({
+                        type: 'CALCULATE_ALL',
+                        payload: {
+                            roundsData: filteredRounds,
+                            teamList: Array.from(allTeamsMap.values()),
+                            championshipName: championship.name
                         }
-                    }));
+                    });
                 }
 
-                setSanctionsData(sCalc.calculateSanctions(allRoundDataCombined, teamList));
-
-                // --- DIGEST UPDATE ON FULL SUCCESS ---
-                if (!isLive) lastCalculationDigest.current = digest;
+                return; // Exit early as worker handles the rest
             } else {
                 // If not needing full sanctions data, at least set the standings
                 const standingsOnly = calculateH2HStandings(allRoundDataCombined.filter(rd => {
-                    const rObj = rounds.find(r => r._id === rd._id || r.number === rd.number);
-                    return rObj && (
-                        rObj.status === 'past' ||
-                        rObj.status === 'historical' ||
-                        rObj.status === 'current' ||
-                        (rObj.date && new Date(rObj.date) < now)
-                    );
+                    return rd.ranking && rd.ranking.length > 0 && rd.matches && rd.matches.length > 0;
                 }));
                 setH2HStandings(standingsOnly);
                 setStandingsLoaded(true);
@@ -782,12 +726,12 @@ export const useTournamentData = (activeTab) => {
             setLoadingAllLineups(false);
             isFetching.current = false;
         }
-    }, [championship, rounds, selectedRoundId, currentRoundNumber, ranking, matches, activeTab]);
+    }, [championship, allRounds, selectedRoundId, currentRoundNumber, ranking, matches, activeTab]);
 
     useEffect(() => {
-        const needsCalc = ['standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams', 'calendar', 'matchups', 'copa'].includes(activeTab);
-        if (needsCalc && rounds.length > 0) calculateTournamentWideData();
-    }, [activeTab, calculateTournamentWideData, rounds]);
+        const needsCalc = ['dashboard', 'welcome', 'standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams', 'calendar', 'matchups', 'copa'].includes(activeTab);
+        if (needsCalc && allRounds.length > 0) calculateTournamentWideData();
+    }, [activeTab, calculateTournamentWideData, allRounds]);
 
     // 4. Load Cup Data
     const loadCupData = useCallback(async () => {
@@ -850,25 +794,26 @@ export const useTournamentData = (activeTab) => {
         if (!championship || championship.type === 'copa') return;
         if (!currentRoundNumber || !sanctionsData?.activeSanctions?.length) return;
 
+        // Only notify for completed rounds to ensure data is final
+        const currentRoundObj = rounds.find(r => r.number === currentRoundNumber);
+        if (currentRoundObj?.status !== 'past') return;
+
         const notifyKey = `ws_notified_${championship._id}_${currentRoundNumber}`;
         const alreadyNotified = localStorage.getItem(notifyKey);
 
         if (!alreadyNotified) {
-            // Configuration for the WhatsApp group
-            const groupName = 'FuentmondoBOT';
+            console.log(`[Notification] Detectado cierre de jornada ${currentRoundNumber}. Enviando reporte...`);
 
-            // Preparing WhatsApp report for current round
-
-            sendWhatsAppReport(sanctionsData.activeSanctions, currentRoundNumber, groupName)
+            sendWhatsAppReport(sanctionsData.activeSanctions, currentRoundNumber, CONFIG.WHATSAPP.groupName)
                 .then(res => {
                     if (res?.success) {
                         localStorage.setItem(notifyKey, 'true');
-                        // WhatsApp report successfully sent
+                        console.log(`[Notification] Reporte enviado y marcado como completado para J${currentRoundNumber}`);
                     }
                 })
-                .catch(err => console.error('[Notification] Failed to send report:', err));
+                .catch(err => console.error('[Notification] Error en envío automático:', err));
         }
-    }, [championship, currentRoundNumber, sanctionsData.activeSanctions]);
+    }, [championship, currentRoundNumber, sanctionsData.activeSanctions, rounds]);
 
     return context;
 };

@@ -35,8 +35,13 @@ app.post('/notify', async (req, res) => {
             console.log(`Reporte enviado al grupo: ${groupName}`);
             res.json({ success: true });
         } else {
-            console.warn(`Grupo no encontrado: ${groupName}`);
-            res.status(404).json({ error: 'Grupo no encontrado. Asegúrate de que el nombre coincide exactamente.' });
+            const availableGroups = chats.filter(c => c.isGroup).map(c => c.name);
+            console.warn(`Grupo no encontrado: "${groupName}"`);
+            console.log('Grupos disponibles:', availableGroups);
+            res.status(404).json({
+                error: 'Grupo no encontrado.',
+                details: `Buscabas "${groupName}", pero solo encontré: ${availableGroups.join(', ') || 'ninguno'}`
+            });
         }
     } catch (err) {
         console.error('Error enviando mensaje:', err);

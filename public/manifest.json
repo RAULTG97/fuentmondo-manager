@@ -1,0 +1,30 @@
+{
+    "name": "Fuentmondo Manager",
+    "short_name": "Fuentmondo",
+    "description": "Gestor profesional de la liga Fuentmondo",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "background_color": "#03040b",
+    "theme_color": "#cf62f1",
+    "icons": [
+        {
+            "src": "favicon.ico",
+            "sizes": "64x64 32x32 24x24 16x16",
+            "type": "image/x-icon",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable any"
+        }
+    ]
+}

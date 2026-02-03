@@ -78,7 +78,8 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
                                 whileTap={{ scale: 0.98 }}
                             >
                                 <div className="team-shield-container">
-                                    <img
+                                    <motion.img
+                                        layoutId={`shield-${name}`}
                                         src={getTeamShield(name)}
                                         alt={name}
                                         className="team-card-shield"
@@ -120,7 +121,8 @@ const TeamsPanel = ({ h2hStandings, onTeamClick }) => {
                         whileTap={{ scale: 0.98 }}
                     >
                         <div className="team-shield-container">
-                            <img
+                            <motion.img
+                                layoutId={`shield-${team.id || team.name}`}
                                 src={getTeamShield(team.name)}
                                 alt={team.name}
                                 className="team-card-shield"

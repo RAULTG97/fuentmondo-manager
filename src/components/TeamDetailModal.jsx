@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { X, Trophy, AlertTriangle, History, User, Loader2, ChevronDown, ChevronUp, Activity } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 import SoccerPitch from './SoccerPitch';
@@ -54,10 +55,10 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         const match = nextRound.matches.find(m => m.homeTeamId === teamId || m.awayTeamId === teamId);
         if (!match) return null;
 
-        const isHome = match.homeTeamId === teamId;
+        const isHome = String(match.homeTeamId) === String(teamId);
         const oppId = isHome ? match.awayTeamId : match.homeTeamId;
         const oppName = isHome ? match.awayName : match.homeName;
-        const oppStats = h2hStandings.find(t => t.id === oppId);
+        const oppStats = h2hStandings.find(t => String(t.id) === String(oppId));
 
         return {
             roundNum: nextRound.number,
@@ -113,7 +114,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
     const { totalPts, totalGen, position } = React.useMemo(() => ({
         totalPts: fullStats.points + (fullStats.hist_pts || 0),
         totalGen: fullStats.gf + (fullStats.hist_gen || 0),
-        position: h2hStandings.findIndex(t => t.id === teamId) + 1
+        position: h2hStandings.findIndex(t => String(t.id) === String(teamId)) + 1
     }), [fullStats, h2hStandings, teamId]);
 
     const last5Matches = React.useMemo(() => {
@@ -296,15 +297,26 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
     }, [isCopa, cupData, teamName]);
 
     return (
-        <div className="modal-overlay fade-in" onClick={onClose}>
-            <div className="modal-content team-detail-card" onClick={e => e.stopPropagation()}>
-                <button className="close-btn" onClick={onClose}><X size={24} /></button>
+        <div className="modal-overlay" onClick={onClose}>
+            <motion.div
+                className="modal-content team-detail-card"
+                onClick={e => e.stopPropagation()}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            >
+                <button className="close-btn" onClick={onClose}><X size={20} /></button>
 
                 {/* COMPACT REFINED HEADER */}
                 <div className="team-detail-header-compact">
                     <div className="header-top">
                         <div className="team-detail-shield-small">
-                            <img src={getTeamShield(teamName)} alt={teamName} />
+                            <motion.img
+                                layoutId={`shield-${teamId || teamName}`}
+                                src={getTeamShield(teamName)}
+                                alt={teamName}
+                            />
                         </div>
                         <div className="header-title-box">
                             <h2 className="team-detail-name">{teamName}</h2>
@@ -574,7 +586,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                             {expandedSections.captains && (
                                 <div className="section-content-inner captains-history-box">
                                     <div className="captains-list-scroll">
-                                        {((isCopa ? teamCopaStats?.captainHistory : stats.captainHistory) || []).slice().reverse().map((h, i) => (
+                                        {((isCopa ? teamCopaStats?.captainHistory : (stats.captainHistory || []))).slice().reverse().map((h, i) => (
                                             <div key={i} className={`cap-history-row ${h.alert ? 'alert' : ''}`}>
                                                 <span className="round">
                                                     {isCopa ? `R${h.round}` : `J${h.round}`}
@@ -592,7 +604,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                         </div>
                     </div>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };

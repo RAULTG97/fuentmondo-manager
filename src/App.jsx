@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getChampionships } from './services/api';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -8,34 +9,37 @@ import { apiCache } from './utils/apiCache';
 import './App.css';
 
 function App() {
-  const [championships, setChampionships] = useState([]);
   const [selectedChampId, setSelectedChampId] = useState(null);
-  const [loading, setLoading] = useState(true);
 
+  // Prune cache on mount (legacy maintenance)
   useEffect(() => {
-    // Maintenance: prune expired/old cache entries on startup
     apiCache.prune();
-
-    getChampionships()
-      .then(data => {
-        const list = data.data || data.championships || [];
-        setChampionships(list);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
   }, []);
 
-  if (loading) {
+  const { data: championshipsData, isLoading, error } = useQuery({
+    queryKey: ['championships'],
+    queryFn: getChampionships,
+    select: (data) => data.data || data.championships || [],
+  });
+
+  if (isLoading) {
     return (
-      <div className="flex-center" style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0f1d' }}>
-        <Loader2 className="animate-spin" size={48} color="#3b82f6" />
+      <div className="flex-center" style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#03040b' }}>
+        <Loader2 className="animate-spin" size={48} color="var(--primary)" />
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex-center" style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#03040b', color: 'var(--error)' }}>
+        <p>Error al cargar campeonatos. Por favor, reintenta.</p>
+        <button onClick={() => window.location.reload()} style={{ marginTop: '1rem' }}>Reintentar</button>
+      </div>
+    );
+  }
+
+  const championships = championshipsData || [];
   const selectedChamp = championships.find(c => c._id === selectedChampId);
 
   return (

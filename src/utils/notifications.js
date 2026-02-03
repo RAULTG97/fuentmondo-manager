@@ -33,7 +33,8 @@ export const sendWhatsAppReport = async (sanctions, roundNumber, groupName) => {
 
     // 3. Call the local bridge
     try {
-        const response = await fetch('http://localhost:3001/notify', {
+        console.log(`[Notification] Inviando reporte a ${groupName} vía ${CONFIG.WHATSAPP.bridgeUrl}/notify`);
+        const response = await fetch(`${CONFIG.WHATSAPP.bridgeUrl}/notify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message: text, groupName })
@@ -41,12 +42,14 @@ export const sendWhatsAppReport = async (sanctions, roundNumber, groupName) => {
 
         if (!response.ok) {
             const errData = await response.json();
+            console.error('[Notification] Error del bridge:', errData);
             throw new Error(errData.error || 'Failed to send message');
         }
 
+        console.log('[Notification] Mensaje enviado con éxito');
         return await response.json();
     } catch (err) {
-        console.warn('WhatsApp bridge is not running at localhost:3001');
-        return { error: 'Bridge offline', details: err.message };
+        console.error('[Notification] Error crítico al contactar bridge:', err);
+        return { error: 'Bridge error', details: err.message };
     }
 };

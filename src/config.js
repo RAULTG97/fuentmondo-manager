@@ -32,5 +32,11 @@ export const CONFIG = {
         matches_out: 3,
         matches_no_captain: 6,
         captaincy_threshold: 3
+    },
+
+    // WhatsApp Bot Config
+    WHATSAPP: {
+        groupName: "FuentmondoBOT",
+        bridgeUrl: "http://localhost:3001"
     }
 };
