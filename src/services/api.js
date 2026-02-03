@@ -36,7 +36,6 @@ const internalApi = axios.create({
 import { apiCache } from '../utils/apiCache';
 
 const internalPost = (endpoint, query) => {
-
     return internalApi.post(endpoint, {
         header: {
             token: CONFIG.INTERNAL_TOKEN,
@@ -45,6 +44,51 @@ const internalPost = (endpoint, query) => {
         query: query,
         answer: {}
     }).then(res => res.data.answer);
+};
+
+/**
+ * Prunes API response data to keep only essential fields for calculation/display.
+ * Reduces local storage usage significantly.
+ */
+const pruneData = (type, data) => {
+    if (!data) return data;
+    try {
+        if (type === 'lineup') {
+            const list = data.players?.initial || data.players || data.lineup || [];
+            const prunedList = list.map(p => ({
+                id: p.player_id || p.id,
+                name: p.name,
+                points: p.points,
+                role: p.role,
+                cpt: p.cpt,
+                captain: p.captain,
+                team: p.team || p.club
+            }));
+            return {
+                ...data,
+                players: { initial: prunedList },
+                lineup: prunedList
+            };
+        }
+        if (type === 'ranking') {
+            return {
+                ...data,
+                ranking: data.ranking?.map(t => ({
+                    _id: t._id,
+                    name: t.name
+                })),
+                // Keep minimal match data
+                matches: data.matches?.map(m => ({
+                    p: m.p,
+                    m: m.m,
+                    id: m.id
+                }))
+            };
+        }
+    } catch (e) {
+        console.warn(`[PRUNE ERROR] Failed for ${type}:`, e);
+    }
+    return data;
 };
 
 // CACHE WRAPPERS
@@ -71,11 +115,12 @@ export const getInternalRankingRound = async (championshipId, roundNumber, isLiv
     }
 
     const data = await internalPost('/1/ranking/round', { championshipId, roundNumber, roundId: roundNumber });
+    const pruned = pruneData('ranking', data);
 
     // Dynamic TTL
     const ttl = isLive ? 60 * 1000 : 24 * 60 * 60 * 1000; // 1 min for live, 24 hours for past
-    apiCache.set(key, data, ttl);
-    return data;
+    apiCache.set(key, pruned, ttl);
+    return pruned;
 };
 
 export const getInternalLineup = async (championshipId, userteamId, roundId, isLive = false) => {
@@ -87,10 +132,11 @@ export const getInternalLineup = async (championshipId, userteamId, roundId, isL
     }
 
     const data = await internalPost('/1/userteam/roundlineup', { championshipId, userteamId, round: roundId });
+    const pruned = pruneData('lineup', data);
 
     const ttl = isLive ? 30 * 1000 : 24 * 60 * 60 * 1000; // 30s for live lineup, 24h for past
-    apiCache.set(key, data, ttl);
-    return data;
+    apiCache.set(key, pruned, ttl);
+    return pruned;
 };
 
 export const getInternalCup = async (championshipId) => {

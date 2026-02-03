@@ -25,12 +25,31 @@ const itemVariants = {
     }
 };
 
-// Memoized Card Component for performance
-const SanctionCard = memo(({ s, currentRound, isExpanded, onToggle, isHistorical, sanctionsData }) => {
-    const startRound = s.outTeamUntil - 2;
-    const referenceRound = Math.max(currentRound, startRound);
-    const outTeamRoundsLeft = Math.max(0, s.outTeamUntil - referenceRound + 1);
-    const totalNoCaptLeft = Math.max(0, s.noCaptUntil - referenceRound + 1);
+// Helper to calculate active status
+const calculateSanctionStatus = (s, rounds, currentRound) => {
+    const outPeriod = 3;
+    const noCaptPeriod = 6;
+    const startRound = s.outTeamUntil - outPeriod + 1;
+
+    // Simple round-based calculation
+    // outTeamUntil and noCaptUntil are absolute round numbers set when sanction was imposed
+    // We just need to calculate how many rounds are left based on current round
+
+    const outTeamRoundsLeft = Math.max(0, s.outTeamUntil - currentRound + 1);
+    const totalNoCaptLeft = Math.max(0, s.noCaptUntil - currentRound + 1);
+
+    return {
+        ...s,
+        outTeamRoundsLeft,
+        totalNoCaptLeft,
+        isFullyServed: currentRound > s.noCaptUntil,
+        startRound
+    };
+};
+
+const SanctionCard = memo(({ s, isExpanded, onToggle, isHistorical, sanctionsData }) => {
+    // Logic extracted to parent, simply using props now
+    const { outTeamRoundsLeft, totalNoCaptLeft, startRound, noCaptUntil, player, teamName } = s;
 
     return (
         <motion.div
@@ -54,15 +73,15 @@ const SanctionCard = memo(({ s, currentRound, isExpanded, onToggle, isHistorical
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <div style={{ padding: '0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--glass-border)' }}>
                         <img
-                            src={getTeamShield(s.teamName)}
+                            src={getTeamShield(teamName)}
                             alt="Shield"
                             style={{ width: '42px', height: '42px', objectFit: 'contain' }}
                             onError={(e) => { e.target.style.opacity = '0'; }}
                         />
                     </div>
                     <div>
-                        <h4 style={{ margin: 0, fontSize: 'var(--font-lg)', fontWeight: 800 }}>{s.player}</h4>
-                        <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.teamName}</p>
+                        <h4 style={{ margin: 0, fontSize: 'var(--font-lg)', fontWeight: 800 }}>{player}</h4>
+                        <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{teamName}</p>
                     </div>
                 </div>
                 <div style={{ opacity: isHistorical ? 0.5 : 1 }}>
@@ -106,8 +125,8 @@ const SanctionCard = memo(({ s, currentRound, isExpanded, onToggle, isHistorical
                             <h5 style={{ margin: '0 0 1rem 0', fontSize: 'var(--font-xs)', color: 'var(--text-main)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Historial de Capitanías</h5>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: '0.5rem' }}>
                                 {(() => {
-                                    const teamId = Object.keys(sanctionsData.teamStats || {}).find(id => sanctionsData.teamStats[id].name === s.teamName);
-                                    const history = teamId ? sanctionsData.teamStats[teamId].captainHistory.filter(h => h.player === s.player) : [];
+                                    const teamId = Object.keys(sanctionsData.teamStats || {}).find(id => sanctionsData.teamStats[id].name === teamName);
+                                    const history = teamId ? sanctionsData.teamStats[teamId].captainHistory.filter(h => h.player === player) : [];
 
                                     return history.map((h, hIdx) => (
                                         <div key={hIdx} style={{
@@ -130,7 +149,7 @@ const SanctionCard = memo(({ s, currentRound, isExpanded, onToggle, isHistorical
 
             <div style={{ marginTop: '1.75rem', paddingTop: '1.25rem', borderTop: '1px solid var(--glass-border)', textAlign: 'center' }}>
                 <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text-dim)', fontWeight: 500 }}>
-                    Periodo: J{s.outTeamUntil - 2} — J{s.noCaptUntil}
+                    Periodo: J{startRound} — J{noCaptUntil}
                 </span>
             </div>
 
@@ -148,31 +167,58 @@ const SanctionCard = memo(({ s, currentRound, isExpanded, onToggle, isHistorical
     );
 });
 
+
 const SanctionedCaptainsPanel = () => {
-    const { sanctionsData, currentRoundNumber, rounds } = useTournament();
+    const { sanctionsData, currentRoundNumber, rounds, allRounds } = useTournament();
     const [filter, setFilter] = useState('current'); // 'current' | 'historical'
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedCard, setExpandedCard] = useState(null);
 
-    const currentRound = currentRoundNumber || 0;
+    const activeSanctions = sanctionsData.activeSanctions || [];
+
+    const effectiveCurrentRound = useMemo(() => {
+        if (!currentRoundNumber) return 0;
+        const roundsToUse = (allRounds && allRounds.length > 0) ? allRounds : rounds;
+        if (!roundsToUse) return currentRoundNumber;
+
+        const r = roundsToUse.find(rd => rd.number === currentRoundNumber);
+
+        // This effectively finished check is now less critical since we check individual matches in SanctionCard
+        // But keeping it for completeness if used elsewhere
+        const isFinished = r?.matches?.length > 0 && r.matches.every(m =>
+            (Array.isArray(m.m) && m.m[0] !== null && m.m[1] !== null) ||
+            m.hasScores ||
+            (m.homeScore !== undefined && m.awayScore !== undefined)
+        );
+
+        return isFinished ? currentRoundNumber + 1 : currentRoundNumber;
+    }, [currentRoundNumber, rounds, allRounds]);
+
+    const currentRound = effectiveCurrentRound;
     const allSanctions = sanctionsData.activeSanctions || [];
+
+    // Enrich sanctions with real-time status
+    const enrichedSanctions = useMemo(() => {
+        const roundsToUse = (allRounds && allRounds.length > 0) ? allRounds : rounds;
+        return activeSanctions.map(s => calculateSanctionStatus(s, roundsToUse, currentRound));
+    }, [activeSanctions, allRounds, rounds, currentRound]);
 
     const filteredTotal = useMemo(() => {
         const cleanTerm = searchTerm.trim().toLowerCase();
-        if (!cleanTerm) return allSanctions;
+        if (!cleanTerm) return enrichedSanctions;
 
-        return allSanctions.filter(s =>
+        return enrichedSanctions.filter(s =>
             (s.teamName || "").toLowerCase().includes(cleanTerm) ||
             (s.player || "").toLowerCase().includes(cleanTerm)
         );
-    }, [allSanctions, searchTerm]);
+    }, [enrichedSanctions, searchTerm]);
 
     const { currentSanctions, historicalSanctions } = useMemo(() => {
         return {
-            currentSanctions: filteredTotal.filter(s => s.noCaptUntil >= currentRound),
-            historicalSanctions: filteredTotal.filter(s => s.noCaptUntil < currentRound)
+            currentSanctions: filteredTotal.filter(s => !s.isFullyServed),
+            historicalSanctions: filteredTotal.filter(s => s.isFullyServed)
         };
-    }, [filteredTotal, currentRound]);
+    }, [filteredTotal]);
 
     const displayedSanctions = filter === 'current' ? currentSanctions : historicalSanctions;
 
@@ -426,7 +472,6 @@ const SanctionedCaptainsPanel = () => {
                             <SanctionCard
                                 key={`${s.player}-${s.teamName}`}
                                 s={s}
-                                currentRound={currentRound}
                                 isExpanded={expandedCard === `${s.player}-${s.teamName}`}
                                 onToggle={() => setExpandedCard(expandedCard === `${s.player}-${s.teamName}` ? null : `${s.player}-${s.teamName}`)}
                                 isHistorical={filter === 'historical'}

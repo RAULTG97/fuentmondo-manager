@@ -71,13 +71,28 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         };
     }, [allRounds, teamId, h2hStandings]);
 
-    const { stats, infractions, activeSanctions } = React.useMemo(() => ({
-        stats: sanctionsData.teamStats?.[teamId] || {},
-        infractions: sanctionsData.infractions?.filter(inf => inf.teamId === teamId) || [],
-        activeSanctions: sanctionsData.activeSanctions?.filter(s =>
-            s.teamId === teamId && s.outTeamUntil >= currentRoundNum
-        ) || []
-    }), [sanctionsData, teamId, currentRoundNum]);
+    const { stats, infractions, activeSanctions } = React.useMemo(() => {
+        const rawStats = sanctionsData.teamStats || {};
+        // 1. Try direct ID lookup
+        let resolvedStats = rawStats[teamId];
+        let resolvedId = teamId;
+
+        // 2. Fallback: Search by name if ID lookup failed
+        if (!resolvedStats && teamName) {
+            resolvedStats = Object.values(rawStats).find(s => s.name === teamName);
+            if (resolvedStats) {
+                resolvedId = resolvedStats.id;
+            }
+        }
+
+        return {
+            stats: resolvedStats || {},
+            infractions: sanctionsData.infractions?.filter(inf => inf.teamId === resolvedId) || [],
+            activeSanctions: sanctionsData.activeSanctions?.filter(s =>
+                s.teamId === resolvedId && s.outTeamUntil >= currentRoundNum
+            ) || []
+        };
+    }, [sanctionsData, teamId, teamName, currentRoundNum]);
 
     // Retrieve last match data directly from the enriched team object
     const { lastLineup, lastScore, lastRoundNum } = React.useMemo(() => {
@@ -101,7 +116,71 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         position: h2hStandings.findIndex(t => t.id === teamId) + 1
     }), [fullStats, h2hStandings, teamId]);
 
-    const last5Matches = (fullStats.matchHistory || []).slice(0, 5);
+    const last5Matches = React.useMemo(() => {
+        if (championship?.type === 'copa') {
+            if (!cupData) return [];
+            const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
+            const history = [];
+
+            // Sort rounds by number ascending to process matches in order
+            const sortedRounds = [...rawRounds].sort((a, b) => a.number - b.number);
+
+            sortedRounds.forEach(r => {
+                const matches = r.matches || [];
+                matches.forEach(m => {
+                    const homeName = m.home?.team?.name;
+                    const awayName = m.away?.team?.name;
+                    const isHome = homeName === teamName;
+                    const isAway = awayName === teamName;
+
+                    if (isHome || isAway) {
+                        // Extract scores
+                        const getSideScore = (side) => {
+                            if (!side) return 0;
+                            if (Array.isArray(side.scores) && side.scores.length > 0) {
+                                return side.scores.reduce((a, b) => a + b, 0);
+                            }
+                            return side.score || 0;
+                        };
+
+                        const myScore = isHome ? getSideScore(m.home) : getSideScore(m.away);
+                        const oppScore = isHome ? getSideScore(m.away) : getSideScore(m.home);
+                        const oppName = isHome ? awayName : homeName;
+
+                        // Check for valid score data
+                        const homeHasScore = (m.home?.scores && m.home.scores.length > 0) || m.home?.score !== undefined;
+                        const awayHasScore = (m.away?.scores && m.away.scores.length > 0) || m.away?.score !== undefined;
+                        const hasMetrics = homeHasScore && awayHasScore;
+
+                        // Loose check for "finished": if it has scores and is not explicitly non-finished state
+                        // or if round is past.
+                        // IMPORTANT: For Copa, often 'status' is missing or ambiguous. Presence of scores usually means played.
+                        // We filter out only if it's explicitly 'scheduled' or 'live' with no scores.
+                        const isFinished =
+                            (m.status === 'finished') ||
+                            (r.status === 'past') ||
+                            (hasMetrics && m.status !== 'scheduled' && m.status !== 'live');
+
+                        if (isFinished && oppName && oppName !== 'TBD') {
+                            let result = 'E';
+                            if (myScore > oppScore) result = 'V';
+                            else if (myScore < oppScore) result = 'D';
+
+                            history.push({
+                                result,
+                                opponentName: oppName,
+                                round: r.number
+                            });
+                        }
+                    }
+                });
+            });
+
+            // Return last 5, reversed so most recent is first
+            return history.reverse().slice(0, 5);
+        }
+        return (fullStats.matchHistory || []).slice(0, 5);
+    }, [championship?.type, cupData, teamName, fullStats.matchHistory]);
 
     const getRoundTitle = (num) => {
         switch (num) {
@@ -299,19 +378,19 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                             </div>
                             <div className="static-content-inner form-container-v2">
                                 <div className="form-shields-row">
-                                    {(isCopa ? [] : last5Matches).map((m, i) => (
+                                    {last5Matches.map((m, i) => (
                                         <div key={i} className="form-shield-item">
                                             <img src={getTeamShield(m.opponentName)} alt={m.opponentName} className="history-shield" />
                                         </div>
                                     ))}
                                 </div>
                                 <div className="form-results-row">
-                                    {(isCopa ? [] : last5Matches).map((m, i) => (
+                                    {last5Matches.map((m, i) => (
                                         <div key={i} className={`form-symbol-v2 result-${m.result}`}>
                                             {m.result}
                                         </div>
                                     ))}
-                                    {isCopa && <p className="no-data-text" style={{ fontSize: '0.8rem', opacity: 0.5 }}>Actualización al finalizar ronda</p>}
+                                    {isCopa && last5Matches.length === 0 && <p className="no-data-text" style={{ fontSize: '0.8rem', opacity: 0.5 }}>Actualización al finalizar ronda</p>}
                                 </div>
                             </div>
                         </div>

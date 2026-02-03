@@ -96,8 +96,8 @@ function SanctionsPanel({ sanctionsData, isCopa, rounds, championshipId, cupData
             )}
 
             <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
-                {sortedTeams.map(team => (
-                    <div key={team.id} className="card" style={{ padding: '0', overflow: 'hidden' }}>
+                {sortedTeams.map((team, idx) => (
+                    <div key={team.id || `team-${idx}`} className="card" style={{ padding: '0', overflow: 'hidden' }}>
                         <div
                             onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
                             style={{

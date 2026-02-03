@@ -3,6 +3,7 @@ import { useTournament } from '../context/TournamentContext';
 import { getInternalRankingRound, getInternalLineup, getInternalCup, getLeagueMatches, getInternalRankingMatches } from '../services/api';
 import { calculateH2HStandings } from '../utils/StandingsCalculator';
 import { CopaSanctionsService } from '../services/copaSanctionsService';
+import { sendWhatsAppReport } from '../utils/notifications';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -26,7 +27,7 @@ export const useTournamentData = (activeTab) => {
         allRounds, setAllRounds,
         historicalCache,
         h2hStandings, setH2HStandings,
-        setSanctionsData,
+        sanctionsData, setSanctionsData,
         cupData, setCupData,
         setLoadingDisplay,
         setLoadingStandings,
@@ -486,11 +487,35 @@ export const useTournamentData = (activeTab) => {
     }, [selectedRoundId, championship, activeTab, loadRoundDetail, rounds]);
 
     // 3. Tournament Wide Calculation
+    // Use a ref to store the "digest" of the last calculation to avoid redundant runs
+    const lastCalculationDigest = useRef('');
+
+    // 3. Tournament Wide Calculation
     const calculateTournamentWideData = useCallback(async () => {
         if (!championship || rounds.length === 0) return;
 
-        // Removing isFetching current check to allow updates from polling to trigger recalc
-        // isFetching.current = true; // We rely on cache to make this fast
+        // --- OPTIMIZATION: Check Digest to skip calculation ---
+        if (isFetching.current) return;
+
+        const isSanctionView = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'matchups', 'copa'].includes(activeTab);
+        const currentRoundObj = rounds.find(r => r.number === currentRoundNumber);
+        const isLive = currentRoundObj?.status === 'current';
+
+        // Digest components: Championship + Round + Data Freshness (Live timestamp vs Static) + Tab Level (Full/Basic)
+        // If live, we use Date.now() logic handled outside or just let it pass if polling. 
+        // Actually, for live polling, we want to update only if data changed, but calculating is cheap vs fetching.
+        // We will skip if static and digest matches.
+        const digest = `${championship._id}_${currentRoundNumber}_${isSanctionView ? 'full' : 'basic'}_${isLive ? 'live' : 'static'}`;
+
+        if (!isLive && lastCalculationDigest.current === digest && standingsLoaded) {
+            // If we already have the heavy data for sanctions, stay put.
+            if (isSanctionView && sanctionsData?.activeSanctions) return;
+            // If basic view (standings) and they are loaded, stay put.
+            if (!isSanctionView && standingsLoaded) return;
+        }
+
+        isFetching.current = true;
+
         const now = new Date();
         const pastRounds = rounds.filter(r => (r.date && new Date(r.date) < now) || r.status === 'past');
         // Include current round if it exists
@@ -500,8 +525,16 @@ export const useTournamentData = (activeTab) => {
             roundsToFetch.push(currentRound);
         }
 
+        // --- CACHE INVALIDATION: Force refetch of current and recently active rounds ---
+        // This ensures sanctions update when a round finishes or starts.
+        roundsToFetch.forEach(r => {
+            const isLiveOrRecent = r.status === 'current' || r.number === currentRoundNumber;
+            if (isLiveOrRecent) {
+                delete historicalCache.current[r._id];
+            }
+        });
+
         if (!standingsLoaded) setLoadingStandings(true);
-        const isSanctionView = ['sanctions', 'captains', 'teams', 'infractions', 'restricted'].includes(activeTab);
         if (isSanctionView) setLoadingAllLineups(true);
 
         try {
@@ -511,8 +544,11 @@ export const useTournamentData = (activeTab) => {
             const batchSizeFetch = 5;
             for (let i = 0; i < neededFetch.length; i += batchSizeFetch) {
                 const batch = neededFetch.slice(i, i + batchSizeFetch);
-                // Historical data -> isLive = false
-                const results = await Promise.all(batch.map(r => getInternalRankingRound(championship._id, r._id, false).catch(() => null)));
+                // Force isLive=true for the current round to bypass 24h cache and ensure fresh sanctions/scores
+                const results = await Promise.all(batch.map(r => {
+                    const isLive = r.status === 'current' || r.number === currentRoundNumber;
+                    return getInternalRankingRound(championship._id, r._id, isLive).catch(() => null);
+                }));
                 results.forEach((data, idx) => {
                     if (data) {
                         const roundInfo = batch[idx];
@@ -546,7 +582,12 @@ export const useTournamentData = (activeTab) => {
             });
 
             // Fetch missing lineups for sanctions logic
-            const needsSanctionsData = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'standings', 'calendar'].includes(activeTab);
+
+            // --- OPTIMIZATION: Previously declared above, reused here ---
+            // const needsSanctionsData = ['sanctions', 'captains', 'teams', 'infractions', 'restricted', 'standings', 'calendar'].includes(activeTab);
+            // Re-using isSanctionView but extending for standings/calendar if needed
+            const needsSanctionsData = isSanctionView || ['standings', 'calendar'].includes(activeTab);
+
             if (needsSanctionsData) {
                 const sCalc = await import('../utils/SanctionsCalculator');
                 const allTeamsMap = new Map();
@@ -600,6 +641,53 @@ export const useTournamentData = (activeTab) => {
                 setStandingsLoaded(true);
                 setLoadingStandings(false); // Can hide standings loader early
 
+                // --- OPTIMIZATION: Targeted fetch of the MOST RECENT lineup for each team ---
+                // This replaces the full 38-round scan for the Teams panel.
+                const teamsNeedingLineup = initialStandings.filter(t => !t.lastMatchData?.lineup);
+                if (teamsNeedingLineup.length > 0) {
+                    const batchSize = 4;
+                    for (let i = 0; i < teamsNeedingLineup.length; i += batchSize) {
+                        const batch = teamsNeedingLineup.slice(i, i + batchSize);
+                        await Promise.all(batch.map(async (team) => {
+                            // Find the latest round with a match for this team
+                            const latestRoundWithMatch = [...filteredRounds]
+                                .sort((a, b) => b.number - a.number)
+                                .find(rd => rd.matches?.some(m => m.homeTeamId === team.id || m.awayTeamId === team.id));
+
+                            if (latestRoundWithMatch) {
+                                try {
+                                    const isLive = latestRoundWithMatch.status === 'current' || latestRoundWithMatch.number === currentRoundNumber;
+                                    const res = await fetchWithRetry(getInternalLineup, championship._id, team.id, latestRoundWithMatch._id, isLive);
+                                    const lineup = (res?.players?.initial) ? res.players.initial : (res?.players || []);
+                                    const match = latestRoundWithMatch.matches.find(m => m.homeTeamId === team.id || m.awayTeamId === team.id);
+
+                                    setH2HStandings(prev => prev.map(t => t.id === team.id ? {
+                                        ...t,
+                                        lastMatchData: {
+                                            round: latestRoundWithMatch.number,
+                                            score: match.homeTeamId === team.id ? match.homeScore : match.awayScore,
+                                            lineup
+                                        }
+                                    } : t));
+                                } catch (e) { /* silent */ }
+                            }
+                        }));
+                    }
+                }
+
+                // --- OPTIMIZATION: Only fetch full lineups if strictly needed for sanctions/captains tabs ---
+                // Re-using isSanctionView variable derived at the start
+                const needsExhaustiveScan = isSanctionView;
+
+                if (!needsExhaustiveScan) {
+                    setLoadingAllLineups(false);
+
+                    // --- DIGEST UPDATE ON PARTIAL SUCCESS ---
+                    if (!isLive) lastCalculationDigest.current = digest;
+
+                    return;
+                }
+
                 // Fetch missing lineups for sanctions logic - REVERSED for priority
                 const reverseRounds = [...allRoundDataCombined].sort((a, b) => b.number - a.number);
 
@@ -616,8 +704,8 @@ export const useTournamentData = (activeTab) => {
                         let anyNew = false;
                         const getLineupSafe = async (tid) => {
                             try {
-                                // Historical lineups -> isLive = false
-                                const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id, false);
+                                const isLive = rd.status === 'current' || rd.number === currentRoundNumber;
+                                const res = await fetchWithRetry(getInternalLineup, championship._id, tid, rd._id, isLive);
                                 return (res?.players?.initial) ? res.players.initial : (res?.players || []);
                             } catch (e) { return []; }
                         };
@@ -667,6 +755,9 @@ export const useTournamentData = (activeTab) => {
                 }
 
                 setSanctionsData(sCalc.calculateSanctions(allRoundDataCombined, teamList));
+
+                // --- DIGEST UPDATE ON FULL SUCCESS ---
+                if (!isLive) lastCalculationDigest.current = digest;
             } else {
                 // If not needing full sanctions data, at least set the standings
                 const standingsOnly = calculateH2HStandings(allRoundDataCombined.filter(rd => {
@@ -680,6 +771,9 @@ export const useTournamentData = (activeTab) => {
                 }));
                 setH2HStandings(standingsOnly);
                 setStandingsLoaded(true);
+
+                // --- DIGEST UPDATE ON BASIC SUCCESS ---
+                if (!isLive) lastCalculationDigest.current = digest;
             }
         } catch (e) {
             console.error("[CALC ERROR] Failed wide calculation:", e);
@@ -691,7 +785,7 @@ export const useTournamentData = (activeTab) => {
     }, [championship, rounds, selectedRoundId, currentRoundNumber, ranking, matches, activeTab]);
 
     useEffect(() => {
-        const needsCalc = ['standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams', 'calendar'].includes(activeTab);
+        const needsCalc = ['standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams', 'calendar', 'matchups', 'copa'].includes(activeTab);
         if (needsCalc && rounds.length > 0) calculateTournamentWideData();
     }, [activeTab, calculateTournamentWideData, rounds]);
 
@@ -750,6 +844,31 @@ export const useTournamentData = (activeTab) => {
             runAnalysis();
         }
     }, [championship?._id, cupData, copaAnalysis, loadingCup, setCopaAnalysis]);
+
+    // 6. Automatic WhatsApp Notification for League Sanctions
+    useEffect(() => {
+        if (!championship || championship.type === 'copa') return;
+        if (!currentRoundNumber || !sanctionsData?.activeSanctions?.length) return;
+
+        const notifyKey = `ws_notified_${championship._id}_${currentRoundNumber}`;
+        const alreadyNotified = localStorage.getItem(notifyKey);
+
+        if (!alreadyNotified) {
+            // Configuration for the WhatsApp group
+            const groupName = 'FuentmondoBOT';
+
+            // Preparing WhatsApp report for current round
+
+            sendWhatsAppReport(sanctionsData.activeSanctions, currentRoundNumber, groupName)
+                .then(res => {
+                    if (res?.success) {
+                        localStorage.setItem(notifyKey, 'true');
+                        // WhatsApp report successfully sent
+                    }
+                })
+                .catch(err => console.error('[Notification] Failed to send report:', err));
+        }
+    }, [championship, currentRoundNumber, sanctionsData.activeSanctions]);
 
     return context;
 };

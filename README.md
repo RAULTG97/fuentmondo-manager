@@ -78,6 +78,60 @@ npm run build
 - `src/utils/`: Lógica de cálculo de sanciones y resolución de equipos.
 - `src/data/`: Ficheros JSON con datos históricos de capitanes y rankings.
 - `public/escudos/`: Galería de imágenes de los equipos participantes.
+- `whatsapp-bot/`: Bot de WhatsApp para notificaciones automáticas.
+
+## 🤖 WhatsApp Bot
+
+La aplicación incluye un bot de WhatsApp local que envía notificaciones automáticas de sanciones al grupo configurado.
+
+### Configuración Rápida
+
+1. Navega al directorio del bot:
+   ```bash
+   cd whatsapp-bot
+   ```
+
+2. Instala dependencias:
+   ```bash
+   npm install
+   ```
+
+3. Inicia el servidor:
+   ```bash
+   node server.js
+   ```
+
+4. Escanea el código QR con WhatsApp
+
+**📖 Documentación completa**: Ver [whatsapp-bot/README.md](whatsapp-bot/README.md)
+
+**⚠️ Importante**: 
+- El bot es **opcional** y solo funciona en entorno local
+- Enviará notificaciones al grupo **"FuentmondoBOT"** (hardcoded)
+- No se despliega en GitHub Pages
+
+## 🚀 Deployment
+
+### GitHub Pages
+
+1. Construye el proyecto:
+   ```bash
+   npm run build
+   ```
+
+2. Despliega a GitHub Pages:
+   ```bash
+   npm run deploy
+   ```
+
+La aplicación estará disponible en: `https://RAULTG97.github.io/fuentmondo-manager`
+
+### Notas de Seguridad
+
+- ✅ Los archivos sensibles del WhatsApp Bot (`.wwebjs_auth/`, `.wwebjs_cache/`) están en `.gitignore`
+- ✅ No se suben credenciales ni datos personales al repositorio
+- ✅ El bot solo funciona en tu máquina local
+
 
 ---
 © 2026 Fuentmondo Manager - Desarrollado para la comunidad Futmondo.
