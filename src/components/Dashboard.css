@@ -1,19 +1,26 @@
 .layout-root {
     display: flex;
     width: 100%;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
+    /* Prevent body scroll */
 }
 
 .dashboard-content {
     flex: 1;
-    padding: 2.5rem 2rem;
+    padding: 2.5rem 2rem 6rem 2rem;
+    /* Added bottom padding */
     overflow-y: auto;
+    /* Content handles scroll */
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2rem;
-    min-height: 100vh;
+    height: 100%;
+    /* Fill container */
+    box-sizing: border-box;
+    /* Ensure padding is handled correct */
 }
 
 .dashboard-header {

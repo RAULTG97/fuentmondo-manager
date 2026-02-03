@@ -6,15 +6,18 @@ export default defineConfig({
   base: '/fuentmondo-manager/',
   plugins: [react()],
   server: {
+    host: true, // Expose to network
     proxy: {
       '/api': {
         target: 'https://api.futmondo.com/external/kong',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
       '/internal-api': {
         target: 'https://api.futmondo.com',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path.replace(/^\/internal-api/, ''),
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {

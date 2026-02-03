@@ -79,44 +79,42 @@ function Sidebar({ activeTab, onTabChange, isCollapsed, onToggle, championship, 
                 </div>
 
             </div>
-            <div className="nav-container-mobile">
-                <nav className="sidebar-nav" ref={navRef}>
-                    {filteredItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeTab === item.id;
+            <nav className="sidebar-nav" ref={navRef}>
+                {filteredItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
 
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => onTabChange(item.id)}
-                                className={`nav-item ${isActive ? 'active' : ''}`}
-                                title={isCollapsed ? item.label : ''}
-                            >
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => onTabChange(item.id)}
+                            className={`nav-item ${isActive ? 'active' : ''}`}
+                            title={isCollapsed ? item.label : ''}
+                        >
+                            {isActive && (
+                                <motion.div
+                                    layoutId="mobile-indicator"
+                                    className="mobile-indicator"
+                                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                />
+                            )}
+
+                            <div className="nav-icon-container">
+                                <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 2} />
                                 {isActive && (
                                     <motion.div
-                                        layoutId="mobile-indicator"
-                                        className="mobile-indicator"
-                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                        layoutId="active-glow"
+                                        className="nav-icon-glow"
+                                        transition={{ duration: 0.2 }}
                                     />
                                 )}
+                            </div>
 
-                                <div className="nav-icon-container">
-                                    <Icon size={isActive ? 22 : 20} strokeWidth={isActive ? 2.5 : 2} />
-                                    {isActive && (
-                                        <motion.div
-                                            layoutId="active-glow"
-                                            className="nav-icon-glow"
-                                            transition={{ duration: 0.2 }}
-                                        />
-                                    )}
-                                </div>
-
-                                <span className="nav-label">{item.label}</span>
-                            </button>
-                        );
-                    })}
-                </nav>
-            </div>
+                            <span className="nav-label">{item.label}</span>
+                        </button>
+                    );
+                })}
+            </nav>
 
             <div className="sidebar-footer">
                 <button className="collapse-btn" onClick={onToggle}>
