@@ -6,19 +6,25 @@ const admin = require('firebase-admin');
 const axios = require('axios');
 
 // 1. Initialize Firebase Admin
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+let db, msg;
+const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+const serviceAccount = serviceAccountRaw ? JSON.parse(serviceAccountRaw) : null;
 
-if (!serviceAccount.project_id) {
-    console.error('Missing FIREBASE_SERVICE_ACCOUNT env var');
+if (!serviceAccount || !serviceAccount.project_id) {
+    console.error('Missing or invalid FIREBASE_SERVICE_ACCOUNT env var');
     process.exit(1);
 }
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
-
-const db = admin.firestore();
-const msg = admin.messaging();
+try {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    db = admin.firestore();
+    msg = admin.messaging();
+} catch (e) {
+    console.error('Firebase Init Error:', e);
+    process.exit(1);
+}
 
 // Configuration
 // Ideally these come from Secrets. Fallback to hardcoded for compatibility if env missing (but warn).
@@ -37,8 +43,19 @@ async function checkUpdates() {
 
         // A. Get Last State from Firestore
         const docRef = db.collection('app_state').doc('last_checked');
-        const doc = await docRef.get();
-        const lastState = doc.exists ? doc.data() : {};
+        let lastState = {};
+        try {
+            console.log('Fetching Firestore state...');
+            const doc = await docRef.get();
+            lastState = doc.exists ? doc.data() : {};
+            console.log('Firestore state loaded.');
+        } catch (dbError) {
+            console.error('Warning: Failed to fetch from Firestore (First run? DB not created?).');
+            console.error('DB Error Code:', dbError.code); // Should be 5 for NOT_FOUND
+            console.error('Proceeding with empty state to attempt self-correction/initialization.');
+            // Proceed with empty object to allow creating the doc later
+            lastState = {};
+        }
 
         // B. Fetch Rounds (Internal API)
         const PIVOT_USERTEAM_ID = '65981926d220e05de3fdc762';
@@ -60,7 +77,7 @@ async function checkUpdates() {
             query: {
                 championshipId: CONFIG.CHAMPIONSHIP_ID,
                 roundNumber: currentRound.number,
-                roundId: currentRound._id
+                roundId: currentRound.id
             },
             answer: {}
         });
@@ -87,7 +104,7 @@ async function checkUpdates() {
                 try {
                     const res = await axios.post(`${CONFIG.BASE_URL}/1/userteam/roundlineup`, {
                         header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-                        query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: teamId, round: currentRound._id },
+                        query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: teamId, round: currentRound.id },
                         answer: {}
                     });
                     const data = res.data.answer || res.data;
