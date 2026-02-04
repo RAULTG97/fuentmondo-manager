@@ -34,4 +34,4 @@ jobs:
           VITE_INTERNAL_USER_ID: ${{ secrets.VITE_INTERNAL_USER_ID }}
           # Fallback ID if needed
           VITE_CHAMPIONSHIP_ID: ${{ secrets.VITE_CHAMPIONSHIP_ID }}
-        run: node scripts/check-updates.js
+        run: node scripts/check-updates.cjs
