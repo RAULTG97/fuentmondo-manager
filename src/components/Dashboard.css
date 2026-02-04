@@ -193,6 +193,12 @@
     gap: 1rem;
 }
 
+@media (max-width: 768px) {
+    .team-cell {
+        gap: 0.5rem;
+    }
+}
+
 .team-cell img {
     width: 28px;
     height: 28px;
@@ -250,52 +256,57 @@
         left: 0 !important;
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 35px !important;
-        width: 35px !important;
+        min-width: 25px !important;
+        width: 25px !important;
         border-right: 1px solid var(--glass-border) !important;
+        font-size: 0.7rem;
+        padding: 0 0.1rem !important;
+        text-align: center;
     }
 
     .sticky-col-2 {
         position: sticky !important;
-        left: 35px !important;
+        left: 25px !important;
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 105px !important;
-        width: 105px !important;
+        min-width: 145px !important;
+        width: 145px !important;
         border-right: 2px solid rgba(59, 130, 246, 0.3) !important;
     }
 
     .sticky-col-3 {
         position: sticky !important;
-        left: 140px !important;
-        /* 35 + 105 */
+        left: 170px !important;
+        /* 25 + 145 */
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 55px !important;
-        width: 55px !important;
+        min-width: 50px !important;
+        width: 50px !important;
         border-right: 1px solid var(--glass-border) !important;
         text-align: center;
+        font-size: 0.8rem;
     }
 
     .sticky-col-4 {
         position: sticky !important;
-        left: 195px !important;
-        /* 35 + 105 + 55 */
+        left: 220px !important;
+        /* 170 + 50 */
         z-index: 100 !important;
         background: #0f172a !important;
-        min-width: 55px !important;
-        width: 55px !important;
+        min-width: 50px !important;
+        width: 50px !important;
         border-right: 1px solid var(--glass-border) !important;
         text-align: center;
+        font-size: 0.8rem;
     }
 
     .sticky-col-3-4 {
         position: sticky !important;
-        left: 140px !important;
+        left: 170px !important;
         z-index: 110 !important;
         background: #1e293b !important;
-        min-width: 110px !important;
-        width: 110px !important;
+        min-width: 100px !important;
+        width: 100px !important;
         text-align: center;
         border-right: 1px solid var(--glass-border) !important;
     }
@@ -306,8 +317,8 @@
         left: 0 !important;
         z-index: 110 !important;
         background: #0f172a !important;
-        min-width: 140px !important;
-        width: 140px !important;
+        min-width: 170px !important;
+        width: 170px !important;
     }
 
     /* Ensure headers stay above cells */

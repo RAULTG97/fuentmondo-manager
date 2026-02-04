@@ -6,7 +6,6 @@ const admin = require('firebase-admin');
 const axios = require('axios');
 
 // 1. Initialize Firebase Admin
-// Expects FIREBASE_SERVICE_ACCOUNT environment variable (JSON string)
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
 
 if (!serviceAccount.project_id) {
@@ -22,57 +21,129 @@ const db = admin.firestore();
 const msg = admin.messaging();
 
 // Configuration
+// Ideally these come from Secrets. Fallback to hardcoded for compatibility if env missing (but warn).
 const CONFIG = {
-    CHAMPIONSHIP_ID: process.env.VITE_CHAMPIONSHIP_ID || '6064d4fd8a7251711287661b', // Default or from env
-    FUTMONDO_API_KEY: process.env.VITE_API_KEY, // From project env
-    FUTMONDO_BASE_URL: 'https://api.futmondo.com/external/kong'
+    CHAMPIONSHIP_ID: process.env.VITE_CHAMPIONSHIP_ID || '6598143af1e53905facfcc6d', // Default to Champions
+    BASE_URL: 'https://api.futmondo.com',
+    AUTH: {
+        TOKEN: process.env.VITE_INTERNAL_TOKEN || 'e1c9_5554f9913726b6e2563b78e8200c5e5b',
+        USER_ID: process.env.VITE_INTERNAL_USER_ID || '55e4de47d26f276304fcc222'
+    }
 };
 
 async function checkUpdates() {
     try {
-        console.log('Starting update check...');
+        console.log('Starting Advanced Update Check...');
 
         // A. Get Last State from Firestore
         const docRef = db.collection('app_state').doc('last_checked');
         const doc = await docRef.get();
         const lastState = doc.exists ? doc.data() : {};
 
-        // B. Fetch Current Data (Example: Rounds)
-        // We need to fetch the rounds to see if a new one is active or has points
-        const response = await axios.get(`${CONFIG.FUTMONDO_BASE_URL}/championship/${CONFIG.CHAMPIONSHIP_ID}/rounds`, {
-            params: { apiKey: CONFIG.FUTMONDO_API_KEY }
+        // B. Fetch Rounds (Internal API)
+        const PIVOT_USERTEAM_ID = '65981926d220e05de3fdc762';
+
+        const roundsResp = await axios.post(`${CONFIG.BASE_URL}/1/userteam/rounds`, {
+            header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
+            query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: PIVOT_USERTEAM_ID },
+            answer: {}
         });
 
-        const rounds = response.data;
-        if (!rounds || !Array.isArray(rounds)) {
-            throw new Error('Invalid API response');
-        }
+        const rounds = roundsResp.data.answer || roundsResp.data;
+        if (!Array.isArray(rounds)) throw new Error('Invalid Rounds API response');
 
         const currentRound = rounds.find(r => r.status === 'current') || rounds[rounds.length - 1];
 
-        // C. Compare
+        // C. Fetch Live Ranking/Scores
+        const rankingResp = await axios.post(`${CONFIG.BASE_URL}/1/ranking/round`, {
+            header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
+            query: {
+                championshipId: CONFIG.CHAMPIONSHIP_ID,
+                roundNumber: currentRound.number,
+                roundId: currentRound._id
+            },
+            answer: {}
+        });
+
+        const rankingData = rankingResp.data.answer || rankingResp.data;
+        const ranking = rankingData.ranking || [];
+
+
+        // Calculate Hash of TEAM Points (Faster/Simpler)
+        const teamPointsHash = ranking
+            .map(t => `${t._id}:${t.points || 0}`)
+            .sort()
+            .join('|');
+
+        // D. Fetch Lineups for Captains Hash (Batched Concurrent Requests)
+        let captainsHash = '';
+        if (currentRound.status === 'current') {
+            console.log('Fetching lineups for captains...');
+            const teams = ranking.map(t => t._id);
+            const captains = [];
+
+            // Helper to fetch lineup and extract captain
+            const fetchLineup = async (teamId) => {
+                try {
+                    const res = await axios.post(`${CONFIG.BASE_URL}/1/userteam/roundlineup`, {
+                        header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
+                        query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: teamId, round: currentRound._id },
+                        answer: {}
+                    });
+                    const data = res.data.answer || res.data;
+                    const list = data.players?.initial || data.players || data.lineup || [];
+                    const captain = list.find(p => p.cpt || p.captain);
+                    const captainName = captain ? (captain.name || captain.nick || 'Unknown') : 'None';
+                    return `${teamId}:${captainName}`;
+                } catch (e) {
+                    return `${teamId}:Error`;
+                }
+            };
+
+            // Process in chunks
+            const chunkSize = 5;
+            for (let i = 0; i < teams.length; i += chunkSize) {
+                const chunk = teams.slice(i, i + chunkSize);
+                const results = await Promise.all(chunk.map(fetchLineup));
+                captains.push(...results);
+            }
+
+            captainsHash = captains.sort().join('|');
+            console.log(`Captains Hash: ${captainsHash.substring(0, 50)}...`);
+        }
+
+        // Combine hashes
+        const masterHash = `${teamPointsHash}#${captainsHash}`;
+
+        console.log(`Current Round: ${currentRound.number} (${currentRound.status})`);
+        console.log(`Master Hash Length: ${masterHash.length}`);
+
+        // E. Compare logic
         let notify = false;
         let notificationTitle = '';
         let notificationBody = '';
 
         if (!lastState.round || lastState.round !== currentRound.number) {
-            // New Round Started
+            // New Round
             notify = true;
             notificationTitle = '¡Nueva Jornada!';
             notificationBody = `La Jornada ${currentRound.number} está en juego.`;
         } else if (lastState.status !== currentRound.status) {
-            // Status Changed (e.g. from current to finalized)
+            // Status changed
             notify = true;
-            notificationTitle = 'Jornada Actualizada';
-            notificationBody = `La Jornada ${currentRound.number} ha cambiado a ${currentRound.status}.`;
+            notificationTitle = 'Estado Actualizado';
+            notificationBody = `La Jornada ${currentRound.number} pasa a: ${currentRound.status}.`;
+        } else if (lastState.hash && lastState.hash !== masterHash && currentRound.status === 'current') {
+            // Hash Changed
+            notify = true;
+            notificationTitle = '🔔 Actualización Fuentmondo';
+            notificationBody = `Han cambiado puntos o capitanes en la J${currentRound.number}. Revisa las sanciones.`;
         }
 
-        // We can add more logic here (e.g. check standard points sum to see if they changed)
-
+        // F. Notify and Save
         if (notify) {
             console.log('Change detected! Sending notification...');
 
-            // D. Send Notification
             const message = {
                 notification: {
                     title: notificationTitle,
@@ -84,10 +155,10 @@ async function checkUpdates() {
             await msg.send(message);
             console.log('Notification sent:', message);
 
-            // E. Update State
             await docRef.set({
                 round: currentRound.number,
                 status: currentRound.status,
+                hash: masterHash,
                 lastUpdate: new Date().toISOString()
             });
         } else {
@@ -95,7 +166,8 @@ async function checkUpdates() {
         }
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error:', error.message);
+        if (error.response) console.error('Data:', error.response.data);
         process.exit(1);
     }
 }

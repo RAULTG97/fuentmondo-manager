@@ -3,6 +3,11 @@ import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
 import { NotificationService } from "./notificationService";
 
+// Only log in development
+const DEBUG = import.meta.env.DEV;
+const log = (...args) => DEBUG && console.log('[Firebase]', ...args);
+const logError = (...args) => console.error('[Firebase]', ...args); // Errors always show
+
 // Configuración de Firebase (Se rellenará luego)
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,7 +25,7 @@ export const FirebaseService = {
         try {
             // Validate config presence
             if (!firebaseConfig.apiKey) {
-                console.error("FIREBASE CONFIG MISSING: apiKey is empty. Check your .env file.");
+                logError("CONFIG MISSING: apiKey is empty. Check your .env file.");
                 return;
             }
 
@@ -29,7 +34,7 @@ export const FirebaseService = {
 
             // Listener para mensajes en primer plano (Foreground)
             onMessage(messaging, (payload) => {
-                console.log('Message received. ', payload);
+                log('Message received.', payload);
                 const { title, body } = payload.notification || {};
 
                 // Usar nuestro servicio de notificaciones para mostrarlo
@@ -39,51 +44,63 @@ export const FirebaseService = {
                 });
             });
 
-            console.log('Firebase Initialized Successfully');
+            log('Initialized Successfully');
         } catch (e) {
-            console.error('Firebase Init Critical Error:', e);
+            logError('Init Critical Error:', e);
         }
     },
 
     requestPermission: async () => {
         if (!messaging) {
-            console.error("Firebase Messaging not initialized");
+            logError("Messaging not initialized");
             return null;
         }
 
         try {
             const permission = await Notification.requestPermission();
-            console.log('Notification Permission Status:', permission);
+            log('Notification Permission Status:', permission);
 
             if (permission === 'granted') {
                 const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
                 if (!vapidKey) {
-                    console.error('ERROR: VITE_FIREBASE_VAPID_KEY is missing in .env!');
+                    logError('VITE_FIREBASE_VAPID_KEY is missing in .env!');
                     return null;
                 }
 
-                console.log('Getting token with VAPID Key length:', vapidKey.length);
+                log('Getting token with VAPID Key length:', vapidKey.length);
 
                 // Use the existing Service Worker (sw.js) for Firebase
                 const registration = await navigator.serviceWorker.ready;
-                console.log('Using SW Registration:', registration.scope);
+                log('Using SW Registration:', registration.scope);
 
                 const token = await getToken(messaging, {
                     vapidKey: vapidKey,
                     serviceWorkerRegistration: registration
                 });
 
-                console.log('FCM Token Success:', token);
+                log('FCM Token obtained (length):', token?.length);
                 return token;
             } else {
-                console.warn('Notification permission denied or dismissed.');
+                log('Notification permission denied or dismissed.');
             }
         } catch (err) {
-            console.error('An error occurred while retrieving token:', err);
-            // Common error: "Messaging: A problem occurred while subscribing the user to FCM..."
-            if (err.code === 'messaging/permission-blocked') {
-                console.error('User blocked notifications.');
+            logError('Error retrieving token:', err.message || err);
+
+            // Detailed Logging for Debugging (only in dev)
+            if (DEBUG) {
+                if (err.message && err.message.includes('unregistered-notification-sender')) {
+                    logError('VAPID Key mismatch or invalid sender ID.');
+                } else if (err.code === 'messaging/permission-blocked') {
+                    logError('User blocked notifications.');
+                } else if (err.code === 'messaging/unsupported-browser') {
+                    logError('Browser not supported (Are you in Home Screen Mode on iOS?)');
+                } else if (err.message && err.message.includes('Missing or insufficient permissions')) {
+                    logError('Permissions missing.');
+                }
             }
+
+            // Allow caller to see the error
+            throw err;
         }
         return null;
     }

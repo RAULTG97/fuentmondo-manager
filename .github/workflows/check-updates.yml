@@ -28,13 +28,10 @@ jobs:
 
       - name: Run Update Check
         env:
-          # Your Firebase Service Account JSON (from Secrets)
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          # API Key for Futmondo (from Secrets or Env)
-          # Assuming you put VITE_API_KEY in repo secrets too as FUTMONDO_API_KEY
-          # OR hardcode if it's public key (less secure but ok for now)
-          # Better to use a secret.
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }} 
-          # Or if it's in .env, we can't read .env easily here.
-          # We'll expect VITE_API_KEY in secrets.
+          # Internal Tokens for Advanced Data (Scores)
+          VITE_INTERNAL_TOKEN: ${{ secrets.VITE_INTERNAL_TOKEN }}
+          VITE_INTERNAL_USER_ID: ${{ secrets.VITE_INTERNAL_USER_ID }}
+          # Fallback ID if needed
+          VITE_CHAMPIONSHIP_ID: ${{ secrets.VITE_CHAMPIONSHIP_ID }}
         run: node scripts/check-updates.js
