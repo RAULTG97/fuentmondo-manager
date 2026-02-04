@@ -1,6 +1,7 @@
 /**
  * Check Updates Script
  * Run by GitHub Actions to check for new rounds/scores
+ * Now uses /5/ranking/matches to mirror "Enfrentamientos" logic (Live Data)
  */
 const admin = require('firebase-admin');
 const axios = require('axios');
@@ -27,9 +28,8 @@ try {
 }
 
 // Configuration
-// Ideally these come from Secrets. Fallback to hardcoded for compatibility if env missing (but warn).
 const CONFIG = {
-    CHAMPIONSHIP_ID: process.env.VITE_CHAMPIONSHIP_ID || '6598143af1e53905facfcc6d', // Default to Champions
+    CHAMPIONSHIP_ID: process.env.VITE_CHAMPIONSHIP_ID || '6598143af1e53905facfcc6d',
     BASE_URL: 'https://api.futmondo.com',
     AUTH: {
         TOKEN: process.env.VITE_INTERNAL_TOKEN || 'e1c9_5554f9913726b6e2563b78e8200c5e5b',
@@ -39,100 +39,104 @@ const CONFIG = {
 
 async function checkUpdates() {
     try {
-        console.log('Starting Advanced Update Check...');
+        console.log('Starting Update Check (Enfrentamientos Mode)...');
 
         // A. Get Last State from Firestore
         const docRef = db.collection('app_state').doc('last_checked');
         let lastState = {};
         try {
-            console.log('Fetching Firestore state...');
             const doc = await docRef.get();
             lastState = doc.exists ? doc.data() : {};
-            console.log('Firestore state loaded.');
         } catch (dbError) {
-            console.error('Warning: Failed to fetch from Firestore (First run? DB not created?).');
-            console.error('DB Error Code:', dbError.code); // Should be 5 for NOT_FOUND
-            console.error('Proceeding with empty state to attempt self-correction/initialization.');
-            // Proceed with empty object to allow creating the doc later
+            console.error('Warning: Failed to fetch from Firestore (First run?). Proceeding empty.');
             lastState = {};
         }
 
-        // B. Fetch Rounds (Internal API)
-        const PIVOT_USERTEAM_ID = '65981926d220e05de3fdc762';
-
-        const roundsResp = await axios.post(`${CONFIG.BASE_URL}/1/userteam/rounds`, {
+        // B. Fetch Full Match Data (The "Enfrentamientos" Endpoint)
+        console.log('Fetching live match data (/5/ranking/matches)...');
+        const resp = await axios.post(`${CONFIG.BASE_URL}/5/ranking/matches`, {
             header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-            query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: PIVOT_USERTEAM_ID },
+            query: { championshipId: CONFIG.CHAMPIONSHIP_ID },
             answer: {}
+        }, {
+            headers: { 'Content-Type': 'application/json', 'User-Agent': 'Node/18' },
+            timeout: 20000
         });
 
-        const rounds = roundsResp.data.answer || roundsResp.data;
-        if (!Array.isArray(rounds)) throw new Error('Invalid Rounds API response');
+        const data = resp.data.answer || resp.data;
+        if (!data) throw new Error('Empty API response');
 
-        const currentRound = rounds.find(r => r.status === 'current') || rounds[rounds.length - 1];
+        // C. Determine Current Round Logic
+        // The API returns 'current' array which are the matches for the active round.
+        // If empty, we look at 'rounds' to find the latest open one.
 
-        // C. Fetch Live Ranking/Scores
-        const rankingResp = await axios.post(`${CONFIG.BASE_URL}/1/ranking/round`, {
-            header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-            query: {
-                championshipId: CONFIG.CHAMPIONSHIP_ID,
-                roundNumber: currentRound.number,
-                roundId: currentRound.id
-            },
-            answer: {}
-        });
+        let currentMatches = data.current || [];
+        let currentRoundNum = null;
+        let currentRoundStatus = 'unknown';
 
-        const rankingData = rankingResp.data.answer || rankingResp.data;
-        const ranking = rankingData.ranking || [];
-
-
-        // Calculate Hash of TEAM Points (Faster/Simpler)
-        const teamPointsHash = ranking
-            .map(t => `${t._id}:${t.points || 0}`)
-            .sort()
-            .join('|');
-
-        // D. Fetch Lineups for Captains Hash (Batched Concurrent Requests)
-        let captainsHash = '';
-        if (currentRound.status === 'current') {
-            console.log('Fetching lineups for captains...');
-            const teams = ranking.map(t => t._id);
-            const captains = [];
-
-            // Helper to fetch lineup and extract captain
-            const fetchLineup = async (teamId) => {
-                try {
-                    const res = await axios.post(`${CONFIG.BASE_URL}/1/userteam/roundlineup`, {
-                        header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-                        query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: teamId, round: currentRound.id },
-                        answer: {}
-                    });
-                    const data = res.data.answer || res.data;
-                    const list = data.players?.initial || data.players || data.lineup || [];
-                    const captain = list.find(p => p.cpt || p.captain);
-                    const captainName = captain ? (captain.name || captain.nick || 'Unknown') : 'None';
-                    return `${teamId}:${captainName}`;
-                } catch (e) {
-                    return `${teamId}:Error`;
-                }
-            };
-
-            // Process in chunks
-            const chunkSize = 5;
-            for (let i = 0; i < teams.length; i += chunkSize) {
-                const chunk = teams.slice(i, i + chunkSize);
-                const results = await Promise.all(chunk.map(fetchLineup));
-                captains.push(...results);
+        if (currentMatches.length > 0) {
+            // Extract round number from first match ID (structure: { id: { r: 1 (means J2), ... } })
+            // Wait, round IDs in Futmondo are usually 0-indexed relative to season start?
+            // Let's trust the data structure or find the round object.
+            if (currentMatches[0].id && typeof currentMatches[0].id.r !== 'undefined') {
+                // If r=0 is J1? Need to cross ref with rounds array.
+                // Actually usually `r` is the round INDEX.
+                // Let's look at `data.rounds` to enable correct numbering.
             }
-
-            captainsHash = captains.sort().join('|');
-            console.log(`Captains Hash: ${captainsHash.substring(0, 50)}...`);
         }
 
-        // Combine hashes
-        const masterHash = `${teamPointsHash}#${captainsHash}`;
+        // Better strategy: Find the round with status 'current' in data.rounds
+        const roundsList = data.rounds || [];
+        let activeRound = roundsList.find(r => r.status === 'current');
 
-        console.log(`Current Round: ${currentRound.number} (${currentRound.status})`);
+        if (!activeRound) {
+            // Fallback: Last played round?
+            activeRound = roundsList[roundsList.length - 1]; // Default to last
+        }
+
+        if (activeRound) {
+            currentRoundNum = activeRound.number;
+            currentRoundStatus = activeRound.status;
+        }
+
+        console.log(`Detected Active Round: ${currentRoundNum} (${currentRoundStatus})`);
+
+        // Filter matches for this round if 'currentMatches' was empty or mismatched
+        // Actually `data.current` seems to be exactly what we want for LIVE scores.
+        // But if round is 'closed', `data.current` might be empty.
+        // If logic relies on "Enfrentamientos", we want scores.
+
+        // Let's calculate points from `currentMatches` if available, otherwise try to find them in `data.matches`?
+        // `data.matches` usually contains ALL matches? Or maybe `data` structure is cleaner.
+        // Lets assume `currentMatches` has the Lineups.
+
+        const teamPointsMap = new Map();
+        const captainsMap = new Map();
+
+        // If we have live matches
+        if (currentMatches.length > 0) {
+            currentMatches.forEach(m => {
+                // Process Home (lineupA)
+                if (m.lineupA) processLineup(m.p[0], m.lineupA, teamPointsMap, captainsMap);
+                // Process Away (lineupB)
+                if (m.lineupB) processLineup(m.p[1], m.lineupB, teamPointsMap, captainsMap);
+            });
+        }
+
+        // Generate Hash
+        // Sort by Team ID to ensure determinism
+        const teamIds = Array.from(teamPointsMap.keys()).sort();
+
+        const teamPointsHash = teamIds.map(tid => `${tid}:${teamPointsMap.get(tid)}`).join('|');
+        const captainsHash = teamIds.map(tid => `${tid}:${captainsMap.get(tid)}`).join('|');
+
+        if (teamIds.length === 0) {
+            console.log('Warning: No live lineups found. Hash will be empty.');
+        } else {
+            console.log(`Computed stats for ${teamIds.length} teams.`);
+        }
+
+        const masterHash = `${teamPointsHash}#${captainsHash}`;
         console.log(`Master Hash Length: ${masterHash.length}`);
 
         // E. Compare logic
@@ -140,21 +144,18 @@ async function checkUpdates() {
         let notificationTitle = '';
         let notificationBody = '';
 
-        if (!lastState.round || lastState.round !== currentRound.number) {
-            // New Round
+        if (!lastState.round || lastState.round !== currentRoundNum) {
             notify = true;
             notificationTitle = '¡Nueva Jornada!';
-            notificationBody = `La Jornada ${currentRound.number} está en juego.`;
-        } else if (lastState.status !== currentRound.status) {
-            // Status changed
+            notificationBody = `La Jornada ${currentRoundNum} está en juego.`;
+        } else if (lastState.status !== currentRoundStatus) {
             notify = true;
             notificationTitle = 'Estado Actualizado';
-            notificationBody = `La Jornada ${currentRound.number} pasa a: ${currentRound.status}.`;
-        } else if (lastState.hash && lastState.hash !== masterHash && currentRound.status === 'current') {
-            // Hash Changed
+            notificationBody = `La Jornada ${currentRoundNum} pasa a: ${currentRoundStatus}.`;
+        } else if (lastState.hash && lastState.hash !== masterHash && currentRoundStatus === 'current') {
             notify = true;
-            notificationTitle = '🔔 Actualización Fuentmondo';
-            notificationBody = `Han cambiado puntos o capitanes en la J${currentRound.number}. Revisa las sanciones.`;
+            notificationTitle = '🔔 Cambios en Puntos/Capitanes';
+            notificationBody = `Actualización en J${currentRoundNum}. Revisa alineaciones.`;
         }
 
         // F. Notify and Save
@@ -170,11 +171,11 @@ async function checkUpdates() {
             };
 
             await msg.send(message);
-            console.log('Notification sent:', message);
+            console.log('Notification sent.');
 
             await docRef.set({
-                round: currentRound.number,
-                status: currentRound.status,
+                round: currentRoundNum,
+                status: currentRoundStatus,
                 hash: masterHash,
                 lastUpdate: new Date().toISOString()
             });
@@ -184,9 +185,20 @@ async function checkUpdates() {
 
     } catch (error) {
         console.error('Error:', error.message);
-        if (error.response) console.error('Data:', error.response.data);
+        if (error.response) console.error('Data:', JSON.stringify(error.response.data || {}).substring(0, 200));
         process.exit(1);
     }
+}
+
+function processLineup(teamId, lineup, pointsMap, captainsMap) {
+    // Sum points
+    const total = lineup.reduce((sum, p) => sum + (p.points || 0), 0);
+    pointsMap.set(teamId, total);
+
+    // Find Captain
+    const captain = lineup.find(p => p.captain || p.cpt); // Futmondo API varies
+    const capName = captain ? (captain.name || captain.nick || 'Unknown') : 'None';
+    captainsMap.set(teamId, capName);
 }
 
 checkUpdates();
