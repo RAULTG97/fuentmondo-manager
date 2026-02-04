@@ -66,37 +66,41 @@ async function checkUpdates() {
         const data = resp.data.answer || resp.data;
         if (!data) throw new Error('Empty API response');
 
-        // C. Determine Current Round Logic
-        // The API returns 'current' array which are the matches for the active round.
-        // If empty, we look at 'rounds' to find the latest open one.
 
+        // C. Determine Current Round Logic
         let currentMatches = data.current || [];
         let currentRoundNum = null;
         let currentRoundStatus = 'unknown';
 
-        if (currentMatches.length > 0) {
-            // Extract round number from first match ID (structure: { id: { r: 1 (means J2), ... } })
-            // Wait, round IDs in Futmondo are usually 0-indexed relative to season start?
-            // Let's trust the data structure or find the round object.
-            if (currentMatches[0].id && typeof currentMatches[0].id.r !== 'undefined') {
-                // If r=0 is J1? Need to cross ref with rounds array.
-                // Actually usually `r` is the round INDEX.
-                // Let's look at `data.rounds` to enable correct numbering.
-            }
-        }
-
-        // Better strategy: Find the round with status 'current' in data.rounds
         const roundsList = data.rounds || [];
-        let activeRound = roundsList.find(r => r.status === 'current');
 
-        if (!activeRound) {
-            // Fallback: Last played round?
-            activeRound = roundsList[roundsList.length - 1]; // Default to last
-        }
+        // Strategy 1: Find 'current' status in rounds list
+        let activeRound = roundsList.find(r => r.status === 'current');
 
         if (activeRound) {
             currentRoundNum = activeRound.number;
             currentRoundStatus = activeRound.status;
+        } else {
+            // Strategy 2: Infer from match ID (Frontend Logic: r + 19)
+            if (currentMatches.length > 0 && currentMatches[0].id && typeof currentMatches[0].id.r !== 'undefined') {
+                console.log(`Debug: Inferring round from match ID: ${currentMatches[0].id.r}`);
+                currentRoundNum = currentMatches[0].id.r + 19;
+                currentRoundStatus = 'current'; // Assume open if we have matches
+            } else {
+                // Strategy 3: Fallback to last known round
+                if (roundsList.length > 0) {
+                    const last = roundsList[roundsList.length - 1];
+                    currentRoundNum = last.number;
+                    currentRoundStatus = last.status;
+                    console.warn('Warning: defaulting to last round in list.');
+                }
+            }
+        }
+
+        if (!currentRoundNum) {
+            console.error('Debug: Rounds List:', JSON.stringify(roundsList));
+            console.error('Debug: Current Matches sample:', currentMatches.length > 0 ? JSON.stringify(currentMatches[0]) : 'Empty');
+            throw new Error("Could not determine Current Round Number. Aborting.");
         }
 
         console.log(`Detected Active Round: ${currentRoundNum} (${currentRoundStatus})`);
