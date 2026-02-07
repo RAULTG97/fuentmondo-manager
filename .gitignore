@@ -35,3 +35,4 @@ whatsapp-bot/node_modules/
 # Env
 .env
 public/firebase-config.js
+debug/
