@@ -95,17 +95,18 @@ async function checkUpdates() {
         roundsList.sort((a, b) => Number(b.number) - Number(a.number));
 
         // Let's filter out 'future' rounds for targeting current/last activity
-        const relevantRounds = roundsList.filter(r => r.status && r.status !== 'future');
+        // Prioritize: current/running > locked > closed
+        const prioritizedRounds = roundsList.filter(r => ['current', 'running', 'locked', 'custom_locked'].includes(r.status));
 
-        // Target the highest-numbered non-future round
-        const activeRound = relevantRounds[0] || roundsList[0];
+        // Target the highest-numbered prioritized round, fallback to latest closed/whatever
+        const activeRound = prioritizedRounds[0] || roundsList[0];
 
         const globalRoundNum = Number(activeRound.number);
         const globalRoundId = activeRound.id || activeRound._id;
         const globalStatus = activeRound.status;
 
-        console.log(`  Found ${roundsList.length} total rounds.`);
-        console.log(`  Targeting J${globalRoundNum} (Estado: ${globalStatus})`);
+        console.log(`  Targeting J${globalRoundNum} (Estado Actual: ${globalStatus})`);
+        console.log(`  Último estado en DB: J${lastState.round} (${lastState.status})`);
 
         // 2. Get Schedule from Active Championships (for Next Round Date)
         let nextRoundDate = null;
@@ -398,9 +399,16 @@ async function checkUpdates() {
             }
         }
 
+        console.log(`--- DEBUG: NOTIFY PRE-CHECK ---`);
+        console.log(`  notify: ${notify}`);
+        console.log(`  lastState.round: ${lastState.round} (type: ${typeof lastState.round})`);
+        console.log(`  globalRoundNum: ${globalRoundNum} (type: ${typeof globalRoundNum})`);
+
         if (notify) {
+            console.log('  Notify already true (Reminder)');
             // Logic handled above (Reminder)
-        } else if (!lastState.round || lastState.round !== globalRoundNum) {
+        } else if (!lastState.round || Number(lastState.round) !== globalRoundNum) {
+            console.log('  Triggering New Round Detection!');
             // New Week / Round Detected
             notify = true;
             notificationTitle = `⚽ ¡Nueva Jornada: J${globalRoundNum}!`;
@@ -512,13 +520,19 @@ async function checkUpdates() {
             console.error('Subscription Error (Non-Fatal):', subError.message);
         }
 
+        if (notify) {
+            console.log(`--- NOTIFICATION PAYLOAD ---`);
+            console.log(`  Title: ${notificationTitle}`);
+            console.log(`  Body:  ${notificationBody}`);
+        }
+
         if (CONFIG.DRY_RUN) {
-            console.log('[DRY RUN] Skipping notification send and state update.');
+            console.log('[DRY RUN] Skipping official send and state update.');
             return;
         }
 
         if (notify) {
-            console.log('Sending notification:', notificationBody);
+            console.log('Sending live notification...');
             const message = {
                 notification: { title: notificationTitle, body: notificationBody },
                 topic: 'general'
