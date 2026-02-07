@@ -20,6 +20,7 @@ const firebaseConfig = {
 };
 
 let messaging = null;
+let app = null;
 
 export const FirebaseService = {
     init: async () => {
@@ -30,7 +31,7 @@ export const FirebaseService = {
                 return;
             }
 
-            const app = initializeApp(firebaseConfig);
+            app = initializeApp(firebaseConfig);
             messaging = getMessaging(app);
 
             // Listener para mensajes en primer plano (Foreground)
