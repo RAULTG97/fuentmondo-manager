@@ -272,12 +272,26 @@ async function checkUpdates() {
                 const list = lData.players?.initial || lData.players || lData.lineup || [];
 
                 const points = list.reduce((sum, p) => sum + (p.points || 0), 0);
+
+                // Calculate Cards/Sanctions
+                const stats = list.reduce((acc, p) => {
+                    const s = p.stats || (p.detailedPoints && p.detailedPoints.data) || {};
+                    acc.y += (s.yellow_card || s.cards_yellow || 0);
+                    acc.r += (s.red_card || s.cards_red || 0);
+                    return acc;
+                }, { y: 0, r: 0 });
+
                 const captain = list.find(p => p.captain || p.cpt);
                 const capName = captain ? (captain.name || captain.nick || 'X') : 'N';
 
-                return `${req.ctxName}:${req.teamId}:${points}:${capName}`;
+                return {
+                    id: `${req.ctxName}:${req.teamId}`,
+                    points: points,
+                    sanctions: `${stats.y}:${stats.r}`,
+                    capName: capName
+                };
             } catch (e) {
-                return `${req.ctxName}:${req.teamId}:ERR:ERR`;
+                return { id: `${req.ctxName}:${req.teamId}`, points: 0, sanctions: '0:0', capName: 'ERR' };
             }
         };
 
