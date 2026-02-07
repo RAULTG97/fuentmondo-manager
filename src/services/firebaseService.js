@@ -1,6 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { NotificationService } from "./notificationService";
 
 // Only log in development
@@ -79,6 +80,21 @@ export const FirebaseService = {
                 });
 
                 log('FCM Token obtained (length):', token?.length);
+
+                // Save token to Firestore
+                try {
+                    const db = getFirestore(app); // Ensure getFirestore is imported
+                    const tokenRef = doc(db, 'fcm_tokens', token);
+                    await setDoc(tokenRef, {
+                        token: token,
+                        updatedAt: new Date().toISOString(),
+                        userAgent: navigator.userAgent
+                    }, { merge: true });
+                    log('Token saved to Firestore');
+                } catch (saveError) {
+                    logError('Error saving token to Firestore:', saveError);
+                }
+
                 return token;
             } else {
                 log('Notification permission denied or dismissed.');

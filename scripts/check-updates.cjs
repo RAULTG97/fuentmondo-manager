@@ -1,11 +1,12 @@
 /**
  * Check Updates Script
  * Run by GitHub Actions to check for new rounds/scores
- * HYBRID STRATEGY V3: 
+ * HYBRID STRATEGY V4: 
  * 1. Get Metadata (RoundId/Num) from /1/userteam/rounds
- * 2. Get Matches/Teams from /5/ranking/matches
+ * 2. Get Matches/Teams from /5/ranking/matches (ALL GROUPS)
  * 3. Map integer IDs to ObjectIds via ARRAY INDEX (pId - 1)
  * 4. Fetch details (Lineup/Captain) via /1/userteam/roundlineup
+ * 5. Subscribe all FCM tokens to 'general' topic before sending
  */
 const admin = require('firebase-admin');
 const axios = require('axios');
@@ -43,7 +44,7 @@ const CONFIG = {
 
 async function checkUpdates() {
     try {
-        console.log('Starting Update Check (Hybrid V3)...');
+        console.log('Starting Update Check (Hybrid V4 with Topic Subscription)...');
 
         // A. Get Last State from Firestore
         const docRef = db.collection('app_state').doc('last_checked');
@@ -89,20 +90,34 @@ async function checkUpdates() {
 
         console.log(`Teams available: ${teamsList.length}`);
 
-        // E. Find Matches for Target Round
+        // E. Find Matches for Target Round (ALL GROUPS)
+        // Groups are arrays of matches. We want ALL matches that belong to targetRoundNum across ALL groups.
         let targetMatches = [];
-        let matchGroup = allRounds.find(group => group.length > 0 && group[0].id && group[0].id.r === targetRoundNum);
 
-        if (!matchGroup) {
-            const offsetNum = targetRoundNum > 19 ? targetRoundNum - 19 : targetRoundNum;
-            matchGroup = allRounds.find(group => group.length > 0 && group[0].id && group[0].id.r === offsetNum);
-            if (matchGroup) console.log(`Found matches via offset logic (r=${offsetNum})`);
-        } else {
-            console.log(`Found matches via exact match (r=${targetRoundNum})`);
-        }
+        // Iterate every group
+        allRounds.forEach((group, index) => {
+            if (!Array.isArray(group) || group.length === 0) return;
 
-        targetMatches = matchGroup || [];
-        console.log(`Found ${targetMatches.length} matches.`);
+            // Check if this group belongs to the target round
+            // Usually all matches in a group belong to the same round.
+            const firstMatch = group[0];
+            const rNum = firstMatch.id ? firstMatch.id.r : null;
+
+            let isTarget = false;
+            if (rNum === targetRoundNum) {
+                isTarget = true;
+            } else if (targetRoundNum > 19 && rNum === (targetRoundNum - 19)) {
+                // Verify offset logic (e.g. Round 20 -> r=1)
+                isTarget = true;
+                //  console.log(`Found match group for J${targetRoundNum} via offset (r=${rNum}) at index ${index}`);
+            }
+
+            if (isTarget) {
+                targetMatches = targetMatches.concat(group);
+            }
+        });
+
+        console.log(`Found ${targetMatches.length} matches across all groups.`);
 
         // F. Extract Users and Fetch Lineups (Using Array Index Mapping)
         const userTeamIds = [];
@@ -115,7 +130,7 @@ async function checkUpdates() {
                     if (teamObj && teamObj._id) {
                         userTeamIds.push(teamObj._id);
                     } else {
-                        console.warn(`Warning: Could not resolve team at index ${pIndex}`);
+                        // console.warn(`Warning: Could not resolve team at index ${pIndex}`);
                     }
                 });
             }
@@ -123,7 +138,7 @@ async function checkUpdates() {
 
         // Unique IDs
         const uniqueUserTeamIds = [...new Set(userTeamIds)];
-        console.log(`Fetching lineups for ${uniqueUserTeamIds.length} teams...`);
+        console.log(`Fetching lineups for ${uniqueUserTeamIds.length} unique teams...`);
 
         const teamPointsMap = new Map();
         const captainsMap = new Map();
@@ -188,6 +203,31 @@ async function checkUpdates() {
             notificationBody = `Actualización en J${targetRoundNum}. Revisa alineaciones.`;
         }
 
+        // --- SUBSCRIBE TOKENS TO TOPIC ---
+        try {
+            const tokensSnapshot = await db.collection('fcm_tokens').get();
+            const tokens = [];
+            tokensSnapshot.forEach(doc => {
+                if (doc.data().token) tokens.push(doc.data().token);
+            });
+
+            if (tokens.length > 0) {
+                console.log(`Subscribing ${tokens.length} tokens to 'general'...`);
+                // Subscribe in batches of 1000 (Firebase limit)
+                const topicName = 'general';
+                for (let i = 0; i < tokens.length; i += 1000) {
+                    const batch = tokens.slice(i, i + 1000);
+                    const response = await msg.subscribeToTopic(batch, topicName);
+                    console.log(`Subscribed batch ${i / 1000 + 1}: Success ${response.successCount}, Fail ${response.failureCount}`);
+                }
+            } else {
+                console.log('No tokens found in fcm_tokens collection to subscribe.');
+            }
+        } catch (subError) {
+            console.error('Error subscribing tokens to topic:', subError);
+            // Don't crash main logic
+        }
+
         if (notify) {
             console.log('Change detected! Sending notification...');
             const message = {
@@ -205,6 +245,16 @@ async function checkUpdates() {
             });
         } else {
             console.log('No significant changes.');
+            // Update timestamp anyway to show it ran? No, keeps history clean.
+            // But we might want to update hash if it changed but no notify (e.g. not current)
+            if (lastState.hash !== masterHash) {
+                await docRef.set({
+                    round: targetRoundNum,
+                    status: targetRoundStatus,
+                    hash: masterHash,
+                    lastUpdate: new Date().toISOString()
+                }, { merge: true });
+            }
         }
 
     } catch (error) {
