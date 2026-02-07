@@ -94,12 +94,16 @@ async function checkUpdates() {
         // Sort by number descending
         roundsList.sort((a, b) => Number(b.number) - Number(a.number));
 
-        // Let's filter out 'future' rounds for targeting current/last activity
-        // Prioritize: current/running > locked > closed
-        const prioritizedRounds = roundsList.filter(r => ['current', 'running', 'locked', 'custom_locked'].includes(r.status));
+        // Filter out 'future' rounds to ensure we only target what's actually playable or recently finished.
+        // This prevents the script from jumping to J24 before its time.
+        const nonFutureRounds = roundsList.filter(r => r.status && r.status !== 'future');
 
-        // Target the highest-numbered prioritized round, fallback to latest closed/whatever
-        const activeRound = prioritizedRounds[0] || roundsList[0];
+        // Prioritize: current/running > locked > closed
+        const prioritizedRounds = nonFutureRounds.filter(r => ['current', 'running', 'locked', 'custom_locked'].includes(r.status));
+
+        // Target the highest-numbered prioritized round (J24 locked > J23 closed),
+        // fallback to latest non-future closed (J23), or absolute latest if start of season.
+        const activeRound = prioritizedRounds[0] || nonFutureRounds[0] || roundsList[0];
 
         const globalRoundNum = Number(activeRound.number);
         const globalRoundId = activeRound.id || activeRound._id;
@@ -482,8 +486,8 @@ async function checkUpdates() {
             // Live updates while playing
             if (lastState.pointsHash !== pointsHash) {
                 notify = true;
-                notificationTitle = `⚽ ¡Gooool! - J${globalRoundNum}`;
-                notificationBody = `¡Hay movimiento! Se acaban de actualizar los puntos. ¡Echadle un ojo al marcador! 👀`;
+                notificationTitle = `📈 Puntos en Vivo - J${globalRoundNum}`;
+                notificationBody = `¡Los marcadores se mueven! Se han actualizado los puntos de la jornada. ¡Echadle un ojo! 👀`;
             } else if (lastState.sanctionsHash !== sanctionsHash) {
                 notify = true;
                 notificationTitle = `⚠️ Alerta de Sanciones - J${globalRoundNum}`;
