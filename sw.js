@@ -25,6 +25,13 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+    // Ignore Firestore/Firebase requests (let them go to network directly)
+    if (e.request.url.includes('firestore.googleapis.com') ||
+        e.request.url.includes('googleapis.com') ||
+        e.request.method !== 'GET') {
+        return;
+    }
+
     // Dynamic caching strategy
     e.respondWith(
         caches.match(e.request).then((res) => {
