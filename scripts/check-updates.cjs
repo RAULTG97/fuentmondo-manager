@@ -39,6 +39,7 @@ const CONFIG = {
         TOKEN: process.env.VITE_INTERNAL_TOKEN || 'e1c9_5554f9913726b6e2563b78e8200c5e5b',
         USER_ID: process.env.VITE_INTERNAL_USER_ID || '55e4de47d26f276304fcc222'
     },
+    DRY_RUN: process.argv.includes('--dry-run'),
     // Championship Contexts
     CONTEXTS: [
         {
@@ -125,7 +126,9 @@ async function checkUpdates() {
         }
 
         // C. Collect Lineup Requests
-        const lineupRequests = []; // { teamId, roundId, champId }
+        // Previously we used a Set with string keys. Now we need to pass objects with teamName.
+        // We will collect objects first, then deduplicate later.
+        const lineupRequests = []; // { teamId, teamName, roundId, champId, ctxName }
 
         // Iterate Contexts
         for (const ctx of CONFIG.CONTEXTS) {
@@ -184,6 +187,7 @@ async function checkUpdates() {
                                     if (team && team._id) {
                                         lineupRequests.push({
                                             teamId: team._id,
+                                            teamName: team.name, // Added for history tracking
                                             roundId: ctxRoundId,
                                             champId: ctx.id,
                                             ctxName: ctx.name
@@ -228,6 +232,7 @@ async function checkUpdates() {
                             if (tA && (tA.id || tA._id)) {
                                 lineupRequests.push({
                                     teamId: tA.id || tA._id,
+                                    teamName: tA.name, // Added for history tracking
                                     roundId: cupRoundId,
                                     champId: ctx.id,
                                     ctxName: ctx.name
@@ -236,6 +241,7 @@ async function checkUpdates() {
                             if (tB && (tB.id || tB._id)) {
                                 lineupRequests.push({
                                     teamId: tB.id || tB._id,
+                                    teamName: tB.name, // Added for history tracking
                                     roundId: cupRoundId,
                                     champId: ctx.id,
                                     ctxName: ctx.name
@@ -253,10 +259,16 @@ async function checkUpdates() {
         }
 
         // D. Fetch Lineups & Calculate Hashes
-        const uniqueRequests = Array.from(requests).map(str => {
-            const [ctxName, champId, teamId, roundId] = str.split('|');
-            return { ctxName, champId, teamId, roundId };
-        });
+        // Need to include teamName in the unique key so it persists through the Set
+        const requests = new Set();
+        for (const r of lineupRequests) {
+            // Using a delimiter that won't appear in names. '|' is risky if name has pipe? 
+            // JSON stringify is safer but slower? Let's stick to pipe but be careful.
+            // Team Name might contain special chars. Let's use JSON stringify for the whole object to be safe.
+            requests.add(JSON.stringify(r));
+        }
+
+        const uniqueRequests = Array.from(requests).map(str => JSON.parse(str));
 
         // LOAD HISTORY (for Captain Sanctions)
         const captainHistory = {}; // { teamId: { counts: { name: count } } }
@@ -294,12 +306,14 @@ async function checkUpdates() {
                 }, { y: 0, r: 0 });
 
                 const captain = list.find(p => p.captain || p.cpt);
-                const capName = captain ? (captain.name || captain.nick || 'X') : 'N';
+                const capName = captain ? (captain.name || captain.nick || 'X').trim() : 'N';
 
                 // Captain Sanction Check
                 let capSanction = null;
                 if (capName !== 'N' && capName !== 'X') {
-                    const teamHist = captainHistory[req.teamId] || { counts: {} };
+                    // Use Team Name as key for history (trim to be safe)
+                    const teamKey = req.teamName ? req.teamName.trim() : req.teamId;
+                    const teamHist = captainHistory[teamKey] || { counts: {} };
                     const histCount = teamHist.counts[capName] || 0;
                     // Check if adding this round triggers sanction (3rd, 6th, etc)
                     // Only effective if round is ACTIVE or CLOSED (implied by this script running context)
@@ -341,7 +355,8 @@ async function checkUpdates() {
         const totalReds = allResults.reduce((sum, r) => sum + parseInt(r.sanctions.split(':')[1]), 0);
 
         // Captain Sanctions Hash: List of names triggering sanction
-        const sanctionsList = allResults.filter(r => r.capSanction).map(r => r.capSanction).sort();
+        // Use a Set to deduplicate names (in case a player is in multiple contexts or duplicate results)
+        const sanctionsList = Array.from(new Set(allResults.filter(r => r.capSanction).map(r => r.capSanction))).sort();
         const capSanctionsHash = sanctionsList.join(',');
 
         const pointsHash = `PTS:${totalPoints}`;
@@ -401,25 +416,31 @@ async function checkUpdates() {
 
                 // UPDATE HISTORY ON CLOSE
                 console.log('Round Closed. Updating Captain History...');
-                for (const res of allResults) {
-                    if (res.req && res.capName && res.capName !== 'N' && res.capName !== 'X') {
-                        const teamRef = db.collection('captain_history').doc(res.req.teamId);
-                        try {
-                            await db.runTransaction(async (t) => {
-                                const doc = await t.get(teamRef);
-                                const data = doc.exists ? doc.data() : { counts: {} };
-                                if (!data.counts) data.counts = {};
+                if (CONFIG.DRY_RUN) {
+                    console.log('  [DRY RUN] Skipping history write.');
+                } else {
+                    for (const res of allResults) {
+                        if (res.req && res.capName && res.capName !== 'N' && res.capName !== 'X') {
+                            // Use Team Name as key
+                            const teamKey = res.req.teamName ? res.req.teamName.trim() : res.req.teamId;
+                            const teamRef = db.collection('captain_history').doc(teamKey);
+                            try {
+                                await db.runTransaction(async (t) => {
+                                    const doc = await t.get(teamRef);
+                                    const data = doc.exists ? doc.data() : { counts: {} };
+                                    if (!data.counts) data.counts = {};
 
-                                // Only increment if not already processed for this round?
-                                // We use lastProcessedRound to prevent double counting
-                                if (!data.lastProcessedRound || data.lastProcessedRound < globalRoundNum) {
-                                    data.counts[res.capName] = (data.counts[res.capName] || 0) + 1;
-                                    data.lastProcessedRound = globalRoundNum;
-                                    t.set(teamRef, data, { merge: true });
-                                }
-                            });
-                        } catch (e) {
-                            console.error(`Failed to update history for ${res.req.teamId}:`, e.message);
+                                    // Only increment if not already processed for this round?
+                                    // We use lastProcessedRound to prevent double counting
+                                    if (!data.lastProcessedRound || data.lastProcessedRound < globalRoundNum) {
+                                        data.counts[res.capName] = (data.counts[res.capName] || 0) + 1;
+                                        data.lastProcessedRound = globalRoundNum;
+                                        t.set(teamRef, data, { merge: true });
+                                    }
+                                });
+                            } catch (e) {
+                                console.error(`Failed to update history for ${teamKey}:`, e.message);
+                            }
                         }
                     }
                 }
@@ -469,6 +490,11 @@ async function checkUpdates() {
             }
         } catch (subError) {
             console.error('Subscription Error (Non-Fatal):', subError.message);
+        }
+
+        if (CONFIG.DRY_RUN) {
+            console.log('[DRY RUN] Skipping notification send and state update.');
+            return;
         }
 
         if (notify) {
