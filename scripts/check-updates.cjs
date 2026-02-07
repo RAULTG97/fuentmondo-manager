@@ -419,7 +419,11 @@ async function checkUpdates() {
                 notificationBody = `¡Arranca la acción en la J${globalRoundNum}! Revisa puntuaciones en vivo. 🚀`;
                 lastState.reminderSent = false;
             } else if (globalStatus === 'closed') {
-                notificationBody = `🏁 La Jornada ${globalRoundNum} ha terminado oficialmente. ¡Pásate a ver cómo ha quedado la cosa! 🏆`;
+                let body = `🏁 La Jornada ${globalRoundNum} ha terminado oficialmente. ¡Pásate a ver cómo ha quedado la cosa! 🏆`;
+                if (capSanctionsHash) {
+                    body += `\n\n⚠️ Sanciones detectadas: ${trunc(capSanctionsHash, 100)}`;
+                }
+                notificationBody = body;
 
                 // UPDATE HISTORY ON CLOSE
                 console.log('Round Closed. Updating Captain History...');
