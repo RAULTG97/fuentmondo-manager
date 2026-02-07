@@ -299,6 +299,23 @@ async function checkUpdates() {
         let notificationTitle = 'Actualización Futmondo';
         let notificationBody = 'Nuevos datos disponibles.';
 
+        // Reminder Logic (24h before)
+        if (nextRoundDate && !lastState.reminderSent && nextRoundNum) { // Check if we have a future date and haven't sent it
+            // Ensure we don't send reminder if the round is already current/locked (handled above)
+            if (globalStatus !== 'current' && globalStatus !== 'locked' && globalStatus !== 'custom_locked') {
+                const now = new Date();
+                const diffMs = nextRoundDate - now;
+                const diffHours = diffMs / (1000 * 60 * 60);
+
+                if (diffHours > 0 && diffHours < 24) {
+                    notify = true;
+                    notificationTitle = `Recordatorio J${nextRoundNum}`;
+                    notificationBody = `⏳ La Jornada ${nextRoundNum} empieza en menos de 24h (${Math.round(diffHours)}h). ¡Revisa tus capitanes!`;
+                    lastState.reminderSent = true;
+                }
+            }
+        }
+
         if (!lastState.round || lastState.round !== globalRoundNum) {
             // New Round Detected (Jumps from X to Y)
             // Usually happens when previous round closes and next one becomes active/pending
@@ -333,16 +350,14 @@ async function checkUpdates() {
         }
 
         if (notify) {
-            // ... notify block ...
-        } else if (lastState.status !== globalStatus) { // Re-check status if not already notified by new round logic
-            // ... status change logic ...
-
+            // Logic handled below
         } else if (lastState.status !== globalStatus) {
             // Status Change within same round
             notify = true;
             notificationTitle = `Jornada ${globalRoundNum}`;
             if (globalStatus === 'current') {
                 notificationBody = `⚽ ¡Arranca la Jornada ${globalRoundNum}!`;
+                lastState.reminderSent = false;
             } else if (globalStatus === 'closed') {
                 notificationBody = `🏁 Jornada ${globalRoundNum} finalizada. Consulta los resultados finales.`;
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
