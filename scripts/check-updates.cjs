@@ -77,10 +77,11 @@ async function checkUpdates() {
             lastState = {};
         }
 
-        // B. Determine GLOBAL Round Number (Master Clock from Primera)
+        // B. Determine GLOBAL Round Number & Schedule (Master Clock from Primera)
         const masterCtx = CONFIG.CONTEXTS[0];
         console.log(`Fetching Master Metadata from ${masterCtx.name}...`);
 
+        // 1. Get Status from standard rounds endpoint (for current status)
         const metaResp = await axios.post(`${CONFIG.BASE_URL}/1/userteam/rounds`, {
             header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
             query: { championshipId: masterCtx.id, userteamId: masterCtx.userTeamId },
@@ -94,6 +95,34 @@ async function checkUpdates() {
         const globalRoundId = activeRound.id || activeRound._id;
         const globalStatus = activeRound.status;
         console.log(`Global Target: J${globalRoundNum} (${globalStatus})`);
+
+        // 2. Get Schedule from Active Championships (for Next Round Date)
+        let nextRoundDate = null;
+        let nextRoundNum = null;
+        try {
+            console.log('Fetching Schedule from /2/user/activechampionships...');
+            const activeResp = await axios.post(`${CONFIG.BASE_URL}/2/user/activechampionships`, {
+                header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
+                query: { excludeGeneral: false, includeProphets: true },
+                answer: {}
+            });
+            const activeData = activeResp.data.answer || activeResp.data;
+            const schedRounds = activeData.rounds || [];
+
+            // Find round for Primera (Master ID)
+            // The rounds array here usually contains the NEXT round info
+            const masterNextRound = schedRounds.find(r => r.championshipId === '504e4f584d8bec9a67000079'); // Primera League ID from user example
+            // OR match by name/context if IDs don't align. 
+            // In the user example, Primera League ID is "504e4f584d8bec9a67000079"
+
+            if (masterNextRound && masterNextRound.beginProcess) {
+                nextRoundDate = new Date(masterNextRound.beginProcess);
+                nextRoundNum = masterNextRound.number;
+                console.log(`Next Round: J${nextRoundNum} starts at ${nextRoundDate.toISOString()}`);
+            }
+        } catch (e) {
+            console.error('Schedule Fetch Error:', e.message);
+        }
 
         // C. Collect Lineup Requests
         const lineupRequests = []; // { teamId, roundId, champId }
@@ -271,14 +300,35 @@ async function checkUpdates() {
         let notificationBody = 'Nuevos datos disponibles.';
 
         if (!lastState.round || lastState.round !== globalRoundNum) {
+            // New Round Detected (Jumps from X to Y)
+            // Usually happens when previous round closes and next one becomes active/pending
             notify = true;
-            notificationBody = `Nueva Jornada ${globalRoundNum} en curso.`;
+            notificationTitle = `Jornada ${globalRoundNum}`;
+            if (globalStatus === 'current') {
+                notificationBody = `⚽ ¡Arranca la Jornada ${globalRoundNum}!`;
+            } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
+                notificationBody = `⏳ Jornada ${globalRoundNum} bloqueada. ¡Revisa tus capitanes! Queda poco.`;
+            } else {
+                notificationBody = `Nueva Jornada ${globalRoundNum} detectada (${globalStatus}).`;
+            }
         } else if (lastState.status !== globalStatus) {
+            // Status Change within same round
             notify = true;
-            notificationBody = `Estado Jornada ${globalRoundNum}: ${globalStatus}.`;
+            notificationTitle = `Jornada ${globalRoundNum}`;
+            if (globalStatus === 'current') {
+                notificationBody = `⚽ ¡Arranca la Jornada ${globalRoundNum}!`;
+            } else if (globalStatus === 'closed') {
+                notificationBody = `🏁 Jornada ${globalRoundNum} finalizada. Consulta los resultados finales.`;
+            } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
+                notificationBody = `⏳ Jornada ${globalRoundNum} bloqueada. ¡Última oportunidad para capitanes!`;
+            } else {
+                notificationBody = `Estado actualizado: ${globalStatus}.`;
+            }
         } else if (lastState.hash && lastState.hash !== masterHash && globalStatus === 'current') {
+            // Score/Lineup Updates during live round
             notify = true;
-            notificationBody = `Cambios en puntuaciones/alineaciones (J${globalRoundNum}).`;
+            notificationTitle = `Jornada ${globalRoundNum} en directo`;
+            notificationBody = `Han cambiado las puntuaciones o alineaciones.`;
         }
 
         // --- SUBSCRIBE TOKENS TO TOPIC ---
@@ -316,16 +366,19 @@ async function checkUpdates() {
                 round: globalRoundNum,
                 status: globalStatus,
                 hash: masterHash,
-                lastUpdate: new Date().toISOString()
+                lastUpdate: new Date().toISOString(),
+                reminderSent: lastState.reminderSent || false
             });
         } else {
             console.log('No significant changes.');
-            if (lastState.hash !== masterHash) {
+            // Always update state if hash or reminder status changed
+            if (lastState.hash !== masterHash || lastState.reminderSent) {
                 await docRef.set({
                     round: globalRoundNum,
                     status: globalStatus,
                     hash: masterHash,
-                    lastUpdate: new Date().toISOString()
+                    lastUpdate: new Date().toISOString(),
+                    reminderSent: lastState.reminderSent || false
                 }, { merge: true });
             }
         }
