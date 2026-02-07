@@ -1,12 +1,12 @@
 /**
  * Check Updates Script
  * Run by GitHub Actions to check for new rounds/scores
- * HYBRID STRATEGY V4: 
- * 1. Get Metadata (RoundId/Num) from /1/userteam/rounds
- * 2. Get Matches/Teams from /5/ranking/matches (ALL GROUPS)
- * 3. Map integer IDs to ObjectIds via ARRAY INDEX (pId - 1)
- * 4. Fetch details (Lineup/Captain) via /1/userteam/roundlineup
- * 5. Subscribe all FCM tokens to 'general' topic before sending
+ * HYBRID STRATEGY V6 (Robust Multi-Champion): 
+ * 1. Checks Primera, Segunda, AND Copa.
+ * 2. Aggregates matches and teams from all sources.
+ * 3. Fetches lineups using specific Round IDs for each championship.
+ * 4. HANDLES MISSING ROUND IDs in Segunda by falling back to Global ID.
+ * 5. Subscribes tokens and notifies on changes.
  */
 const admin = require('firebase-admin');
 const axios = require('axios');
@@ -34,17 +34,37 @@ try {
 
 // Configuration
 const CONFIG = {
-    CHAMPIONSHIP_ID: process.env.VITE_CHAMPIONSHIP_ID || '6598143af1e53905facfcc6d',
     BASE_URL: 'https://api.futmondo.com',
     AUTH: {
         TOKEN: process.env.VITE_INTERNAL_TOKEN || 'e1c9_5554f9913726b6e2563b78e8200c5e5b',
         USER_ID: process.env.VITE_INTERNAL_USER_ID || '55e4de47d26f276304fcc222'
-    }
+    },
+    // Championship Contexts
+    CONTEXTS: [
+        {
+            id: '6598143af1e53905facfcc6d',
+            name: 'Primera',
+            type: 'league',
+            userTeamId: '65981926d220e05de3fdc762' // Used for Metadata master clock
+        },
+        {
+            id: '65981dd8f1fa9605fbefe305',
+            name: 'Segunda',
+            type: 'league',
+            userTeamId: null
+        },
+        {
+            id: '697663371311f0fd5379a446',
+            name: 'Copa',
+            type: 'cup',
+            userTeamId: '69766337c15cdb2bd57b94c0'
+        }
+    ]
 };
 
 async function checkUpdates() {
     try {
-        console.log('Starting Update Check (Hybrid V4 with Topic Subscription)...');
+        console.log('Starting Update Check (Hybrid V6 - Robust Multi-Champion)...');
 
         // A. Get Last State from Firestore
         const docRef = db.collection('app_state').doc('last_checked');
@@ -57,150 +77,208 @@ async function checkUpdates() {
             lastState = {};
         }
 
-        // B. Fetch Round Metadata (Legacy API)
-        const PIVOT_USERTEAM_ID = '65981926d220e05de3fdc762';
-        console.log('Fetching round metadata...');
+        // B. Determine GLOBAL Round Number (Master Clock from Primera)
+        const masterCtx = CONFIG.CONTEXTS[0];
+        console.log(`Fetching Master Metadata from ${masterCtx.name}...`);
+
         const metaResp = await axios.post(`${CONFIG.BASE_URL}/1/userteam/rounds`, {
             header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-            query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: PIVOT_USERTEAM_ID },
+            query: { championshipId: masterCtx.id, userteamId: masterCtx.userTeamId },
             answer: {}
         });
-
         const rounds = metaResp.data.answer || metaResp.data;
-        if (!Array.isArray(rounds)) throw new Error('Invalid Rounds Metadata response');
-
+        // activeRound is the CURRENT one, or the last one if season ended/paused
         const activeRound = rounds.find(r => r.status === 'current') || rounds[rounds.length - 1];
-        const targetRoundNum = activeRound.number;
-        const targetRoundId = activeRound.id || activeRound._id;
-        const targetRoundStatus = activeRound.status;
 
-        console.log(`Target Round: ${targetRoundNum} (ID: ${targetRoundId}, Status: ${targetRoundStatus})`);
+        const globalRoundNum = Number(activeRound.number);
+        const globalRoundId = activeRound.id || activeRound._id;
+        const globalStatus = activeRound.status;
+        console.log(`Global Target: J${globalRoundNum} (${globalStatus})`);
 
-        // C. Fetch Live Match Data (Enfrentamientos API)
-        console.log('Fetching live match data...');
-        const dataResp = await axios.post(`${CONFIG.BASE_URL}/5/ranking/matches`, {
-            header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-            query: { championshipId: CONFIG.CHAMPIONSHIP_ID },
-            answer: {}
-        }, { headers: { 'Content-Type': 'application/json' }, timeout: 20000 });
+        // C. Collect Lineup Requests
+        const lineupRequests = []; // { teamId, roundId, champId }
 
-        const data = dataResp.data.answer || dataResp.data;
-        const allRounds = data.rounds || [];
-        const teamsList = data.teams || []; // ORDERED ARRAY for indexing
+        // Iterate Contexts
+        for (const ctx of CONFIG.CONTEXTS) {
+            console.log(`\nProcessing ${ctx.name} (${ctx.type})...`);
 
-        console.log(`Teams available: ${teamsList.length}`);
+            if (ctx.type === 'league') {
+                try {
+                    const res = await axios.post(`${CONFIG.BASE_URL}/5/ranking/matches`, {
+                        header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
+                        query: { championshipId: ctx.id },
+                        answer: {}
+                    });
+                    const d = res.data.answer || res.data;
+                    const teamsList = d.teams || [];
+                    const allRoundGroups = d.rounds || [];
 
-        // E. Find Matches for Target Round (ALL GROUPS)
-        // Groups are arrays of matches. We want ALL matches that belong to targetRoundNum across ALL groups.
-        let targetMatches = [];
+                    // Find group for Global Round (Prioritize Exact Match)
+                    let targetGroup = null;
+                    let ctxRoundId = null;
 
-        // Iterate every group
-        allRounds.forEach((group, index) => {
-            if (!Array.isArray(group) || group.length === 0) return;
+                    const exactGroup = allRoundGroups.find(g => g.length > 0 && g[0].id && Number(g[0].id.r) === globalRoundNum);
 
-            // Check if this group belongs to the target round
-            // Usually all matches in a group belong to the same round.
-            const firstMatch = group[0];
-            const rNum = firstMatch.id ? firstMatch.id.r : null;
-
-            let isTarget = false;
-            if (rNum === targetRoundNum) {
-                isTarget = true;
-            } else if (targetRoundNum > 19 && rNum === (targetRoundNum - 19)) {
-                // Verify offset logic (e.g. Round 20 -> r=1)
-                isTarget = true;
-                //  console.log(`Found match group for J${targetRoundNum} via offset (r=${rNum}) at index ${index}`);
-            }
-
-            if (isTarget) {
-                targetMatches = targetMatches.concat(group);
-            }
-        });
-
-        console.log(`Found ${targetMatches.length} matches across all groups.`);
-
-        // F. Extract Users and Fetch Lineups (Using Array Index Mapping)
-        const userTeamIds = [];
-        targetMatches.forEach(m => {
-            if (m.p) {
-                m.p.forEach(pIndex => {
-                    // pIndex is 1-based index into data.teams
-                    // e.g. pIndex 1 maps to teamsList[0]
-                    const teamObj = teamsList[pIndex - 1];
-                    if (teamObj && teamObj._id) {
-                        userTeamIds.push(teamObj._id);
+                    if (exactGroup) {
+                        targetGroup = exactGroup;
+                        const rIdObj = targetGroup[0].id;
+                        ctxRoundId = rIdObj.id || rIdObj._id;
+                        console.log(`  Found Exact Match r=${globalRoundNum}`);
                     } else {
-                        // console.warn(`Warning: Could not resolve team at index ${pIndex}`);
+                        console.log(`  Exact Match r=${globalRoundNum} NOT found via r-check.`);
                     }
-                });
+
+                    // FALLBACK STRATEGY (Applied to ALL leagues now)
+                    if (!ctxRoundId) {
+                        console.log(`  Missing Group ID for ${ctx.name}. Applying Logic...`);
+
+                        // 1. Try Offset Group if Target wasn't found exact
+                        if (!targetGroup) {
+                            const offsetGroup = (globalRoundNum > 19)
+                                ? allRoundGroups.find(g => g.length > 0 && g[0].id && Number(g[0].id.r) === (globalRoundNum - 19))
+                                : null;
+                            if (offsetGroup) targetGroup = offsetGroup;
+                        }
+
+                        // 2. Override/Set ID using Global Master if still missing (Segunda Case)
+                        // Even if targetGroup found but has no ID, or if we fallback entirely
+                        console.log(`  -> Using Global Round ID: ${globalRoundId}`);
+                        ctxRoundId = globalRoundId;
+                    }
+
+                    if (targetGroup && ctxRoundId) {
+                        console.log(`  Processing ${targetGroup.length} matches...`);
+                        targetGroup.forEach(m => {
+                            if (m.p) {
+                                m.p.forEach(pIndex => {
+                                    const team = teamsList[pIndex - 1];
+                                    if (team && team._id) {
+                                        lineupRequests.push({
+                                            teamId: team._id,
+                                            roundId: ctxRoundId,
+                                            champId: ctx.id,
+                                            ctxName: ctx.name
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    } else {
+                        console.log(`  No matches found for J${globalRoundNum} (TargetGroup: ${!!targetGroup})`);
+                    }
+                } catch (e) {
+                    console.error(`  Error processing ${ctx.name}:`, e.message);
+                }
+
+            } else if (ctx.type === 'cup') {
+                try {
+                    const res = await axios.post(`${CONFIG.BASE_URL}/5/cup/get`, {
+                        header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
+                        query: { championshipId: ctx.id, userteamId: ctx.userTeamId },
+                        answer: {}
+                    });
+                    const d = res.data.answer || res.data;
+                    const cupRounds = d.rounds || [];
+
+                    // Find active round (Running or Current)
+                    let activeCupRound = cupRounds.find(r => r.current === true);
+
+                    // Fallback: Find last round with non-finished matches
+                    if (!activeCupRound && cupRounds.length > 0) {
+                        activeCupRound = cupRounds.reverse().find(r => r.matches && r.matches.some(m => !m.finished)) || cupRounds[0];
+                    }
+
+                    if (activeCupRound && activeCupRound.matches) {
+                        console.log(`  Active Cup Round: ${activeCupRound.number} (Matches: ${activeCupRound.matches.length})`);
+                        const cupRoundId = activeCupRound.id || activeCupRound._id || activeCupRound.roundId;
+
+                        activeCupRound.matches.forEach(m => {
+                            const tA = m.home?.team;
+                            const tB = m.away?.team;
+
+                            if (tA && (tA.id || tA._id)) {
+                                lineupRequests.push({
+                                    teamId: tA.id || tA._id,
+                                    roundId: cupRoundId,
+                                    champId: ctx.id,
+                                    ctxName: ctx.name
+                                });
+                            }
+                            if (tB && (tB.id || tB._id)) {
+                                lineupRequests.push({
+                                    teamId: tB.id || tB._id,
+                                    roundId: cupRoundId,
+                                    champId: ctx.id,
+                                    ctxName: ctx.name
+                                });
+                            }
+                        });
+                    } else {
+                        console.log('  No active cup round found.');
+                    }
+
+                } catch (e) {
+                    console.error(`  Error processing ${ctx.name}:`, e.message);
+                }
             }
-        });
+        }
 
-        // Unique IDs
-        const uniqueUserTeamIds = [...new Set(userTeamIds)];
-        console.log(`Fetching lineups for ${uniqueUserTeamIds.length} unique teams...`);
+        // D. Fetch Lineups (Batch)
+        // Deduplicate requests by unique tuple
+        const uniqueRequests = lineupRequests.filter((v, i, a) => a.findIndex(t => (t.teamId === v.teamId && t.roundId === v.roundId && t.champId === v.champId)) === i);
 
-        const teamPointsMap = new Map();
-        const captainsMap = new Map();
+        console.log(`\nFetching ${uniqueRequests.length} lineups...`);
 
-        // Helper to fetch lineup
-        const fetchLineup = async (teamId) => {
+        const hashComponents = [];
+
+        // Helper
+        const fetchLineup = async (req) => {
             try {
                 const res = await axios.post(`${CONFIG.BASE_URL}/1/userteam/roundlineup`, {
                     header: { token: CONFIG.AUTH.TOKEN, userid: CONFIG.AUTH.USER_ID },
-                    query: { championshipId: CONFIG.CHAMPIONSHIP_ID, userteamId: teamId, round: targetRoundId },
+                    query: { championshipId: req.champId, userteamId: req.teamId, round: req.roundId },
                     answer: {}
                 });
                 const lData = res.data.answer || res.data;
                 const list = lData.players?.initial || lData.players || lData.lineup || [];
 
-                // Sum points
-                const total = list.reduce((sum, p) => sum + (p.points || 0), 0);
-                teamPointsMap.set(teamId, total);
-
-                // Find Captain
+                const points = list.reduce((sum, p) => sum + (p.points || 0), 0);
                 const captain = list.find(p => p.captain || p.cpt);
-                const capName = captain ? (captain.name || captain.nick || 'Unknown') : 'None';
-                captainsMap.set(teamId, capName);
+                const capName = captain ? (captain.name || captain.nick || 'X') : 'N';
 
+                return `${req.ctxName}:${req.teamId}:${points}:${capName}`;
             } catch (e) {
-                teamPointsMap.set(teamId, 0);
-                captainsMap.set(teamId, 'Error');
+                return `${req.ctxName}:${req.teamId}:ERR:ERR`;
             }
         };
 
-        // Batch execution
-        const chunkSize = 5;
-        for (let i = 0; i < uniqueUserTeamIds.length; i += chunkSize) {
-            const chunk = uniqueUserTeamIds.slice(i, i + chunkSize);
-            await Promise.all(chunk.map(fetchLineup));
+        // Batch execution (Chunk 20 for speed)
+        const chunkSize = 20;
+        for (let i = 0; i < uniqueRequests.length; i += chunkSize) {
+            const chunk = uniqueRequests.slice(i, i + chunkSize);
+            const results = await Promise.all(chunk.map(fetchLineup));
+            hashComponents.push(...results);
         }
 
-        // G. Compute Hash
-        const sortedIds = Array.from(teamPointsMap.keys()).sort();
-        const teamPointsHash = sortedIds.map(tid => `${tid}:${teamPointsMap.get(tid)}`).join('|');
-        const captainsHash = sortedIds.map(tid => `${tid}:${captainsMap.get(tid)}`).join('|');
-        const masterHash = `${teamPointsHash}#${captainsHash}`;
-
+        // E. Compute Hash
+        hashComponents.sort();
+        const masterHash = hashComponents.join('|');
         console.log(`Master Hash Length: ${masterHash.length}`);
 
-        // H. Notify Logic
+        // F. Notify Logic
         let notify = false;
-        let notificationTitle = '';
-        let notificationBody = '';
+        let notificationTitle = 'Actualización Futmondo';
+        let notificationBody = 'Nuevos datos disponibles.';
 
-        if (!lastState.round || lastState.round !== targetRoundNum) {
+        if (!lastState.round || lastState.round !== globalRoundNum) {
             notify = true;
-            notificationTitle = '¡Nueva Jornada!';
-            notificationBody = `La Jornada ${targetRoundNum} está en juego.`;
-        } else if (lastState.status !== targetRoundStatus) {
+            notificationBody = `Nueva Jornada ${globalRoundNum} en curso.`;
+        } else if (lastState.status !== globalStatus) {
             notify = true;
-            notificationTitle = 'Estado Actualizado';
-            notificationBody = `La Jornada ${targetRoundNum} pasa a: ${targetRoundStatus}.`;
-        } else if (lastState.hash && lastState.hash !== masterHash && targetRoundStatus === 'current') {
+            notificationBody = `Estado Jornada ${globalRoundNum}: ${globalStatus}.`;
+        } else if (lastState.hash && lastState.hash !== masterHash && globalStatus === 'current') {
             notify = true;
-            notificationTitle = '🔔 Cambios en Puntos/Capitanes';
-            notificationBody = `Actualización en J${targetRoundNum}. Revisa alineaciones.`;
+            notificationBody = `Cambios en puntuaciones/alineaciones (J${globalRoundNum}).`;
         }
 
         // --- SUBSCRIBE TOKENS TO TOPIC ---
@@ -213,44 +291,39 @@ async function checkUpdates() {
 
             if (tokens.length > 0) {
                 console.log(`Subscribing ${tokens.length} tokens to 'general'...`);
-                // Subscribe in batches of 1000 (Firebase limit)
                 const topicName = 'general';
                 for (let i = 0; i < tokens.length; i += 1000) {
                     const batch = tokens.slice(i, i + 1000);
                     const response = await msg.subscribeToTopic(batch, topicName);
-                    console.log(`Subscribed batch ${i / 1000 + 1}: Success ${response.successCount}, Fail ${response.failureCount}`);
+                    console.log(`Batch ${i / 1000 + 1}: Success ${response.successCount}`);
                 }
             } else {
-                console.log('No tokens found in fcm_tokens collection to subscribe.');
+                console.log('No tokens found to subscribe.');
             }
         } catch (subError) {
-            console.error('Error subscribing tokens to topic:', subError);
-            // Don't crash main logic
+            console.error('Subscription Error (Non-Fatal):', subError.message);
         }
 
         if (notify) {
-            console.log('Change detected! Sending notification...');
+            console.log('Sending notification:', notificationBody);
             const message = {
                 notification: { title: notificationTitle, body: notificationBody },
                 topic: 'general'
             };
             await msg.send(message);
-            console.log('Notification sent.');
 
             await docRef.set({
-                round: targetRoundNum,
-                status: targetRoundStatus,
+                round: globalRoundNum,
+                status: globalStatus,
                 hash: masterHash,
                 lastUpdate: new Date().toISOString()
             });
         } else {
             console.log('No significant changes.');
-            // Update timestamp anyway to show it ran? No, keeps history clean.
-            // But we might want to update hash if it changed but no notify (e.g. not current)
             if (lastState.hash !== masterHash) {
                 await docRef.set({
-                    round: targetRoundNum,
-                    status: targetRoundStatus,
+                    round: globalRoundNum,
+                    status: globalStatus,
                     hash: masterHash,
                     lastUpdate: new Date().toISOString()
                 }, { merge: true });
@@ -258,7 +331,7 @@ async function checkUpdates() {
         }
 
     } catch (error) {
-        console.error('Error:', error.message);
+        console.error('Fatal Error:', error.message);
         process.exit(1);
     }
 }
