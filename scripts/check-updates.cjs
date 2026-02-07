@@ -252,11 +252,23 @@ async function checkUpdates() {
             }
         }
 
-        // D. Fetch Lineups (Batch)
-        // Deduplicate requests by unique tuple
-        const uniqueRequests = lineupRequests.filter((v, i, a) => a.findIndex(t => (t.teamId === v.teamId && t.roundId === v.roundId && t.champId === v.champId)) === i);
+        // D. Fetch Lineups & Calculate Hashes
+        const uniqueRequests = Array.from(requests).map(str => {
+            const [ctxName, champId, teamId, roundId] = str.split('|');
+            return { ctxName, champId, teamId, roundId };
+        });
 
-        console.log(`\nFetching ${uniqueRequests.length} lineups...`);
+        // LOAD HISTORY (for Captain Sanctions)
+        const captainHistory = {}; // { teamId: { counts: { name: count } } }
+        try {
+            const histSnap = await db.collection('captain_history').get();
+            histSnap.forEach(doc => {
+                captainHistory[doc.id] = doc.data();
+            });
+            console.log(`Loaded history for ${Object.keys(captainHistory).length} teams.`);
+        } catch (e) {
+            console.error('Error loading history:', e.message);
+        }
 
         const hashComponents = [];
 
@@ -284,11 +296,26 @@ async function checkUpdates() {
                 const captain = list.find(p => p.captain || p.cpt);
                 const capName = captain ? (captain.name || captain.nick || 'X') : 'N';
 
+                // Captain Sanction Check
+                let capSanction = null;
+                if (capName !== 'N' && capName !== 'X') {
+                    const teamHist = captainHistory[req.teamId] || { counts: {} };
+                    const histCount = teamHist.counts[capName] || 0;
+                    // Check if adding this round triggers sanction (3rd, 6th, etc)
+                    // Only effective if round is ACTIVE or CLOSED (implied by this script running context)
+                    // We assume +1 for current round
+                    if ((histCount + 1) % 3 === 0) {
+                        capSanction = `${capName} (3ª)`; // trigger string
+                    }
+                }
+
                 return {
                     id: `${req.ctxName}:${req.teamId}`,
                     points: points,
                     sanctions: `${stats.y}:${stats.r}`,
-                    capName: capName
+                    capName: capName,
+                    capSanction: capSanction,
+                    req: req // pass request info for updates
                 };
             } catch (e) {
                 return { id: `${req.ctxName}:${req.teamId}`, points: 0, sanctions: '0:0', capName: 'ERR' };
@@ -297,16 +324,35 @@ async function checkUpdates() {
 
         // Batch execution (Chunk 20 for speed)
         const chunkSize = 20;
+        const allResults = [];
         for (let i = 0; i < uniqueRequests.length; i += chunkSize) {
             const chunk = uniqueRequests.slice(i, i + chunkSize);
             const results = await Promise.all(chunk.map(fetchLineup));
-            hashComponents.push(...results);
+            allResults.push(...results);
         }
 
-        // E. Compute Hash
-        hashComponents.sort();
-        const masterHash = hashComponents.join('|');
-        console.log(`Master Hash Length: ${masterHash.length}`);
+        // E. Compute Hashes
+        // 1. Master Hash (General Change Detection)
+        const masterString = allResults.map(r => `${r.id}:${r.points}:${r.sanctions}:${r.capName}`).sort().join('|');
+
+        // 2. Specific Hashes
+        const totalPoints = allResults.reduce((sum, r) => sum + r.points, 0);
+        const totalYellows = allResults.reduce((sum, r) => sum + parseInt(r.sanctions.split(':')[0]), 0);
+        const totalReds = allResults.reduce((sum, r) => sum + parseInt(r.sanctions.split(':')[1]), 0);
+
+        // Captain Sanctions Hash: List of names triggering sanction
+        const sanctionsList = allResults.filter(r => r.capSanction).map(r => r.capSanction).sort();
+        const capSanctionsHash = sanctionsList.join(',');
+
+        const pointsHash = `PTS:${totalPoints}`;
+        // Combine Card Sanctions and Captain Sanctions into one hash or keep separate?
+        // User said "sanciones" refers to captains mainly.
+        // Let's combine for "Sanction Notifications" generic bucket, OR specific.
+        // "Nuevas tarjetas" vs "Sanción Capitanía".
+        // Use a composite hash for sanctions check.
+        const sanctionsHash = `Y:${totalYellows}|R:${totalReds}|C:${capSanctionsHash}`;
+
+        console.log(`Global Stats: ${pointsHash} | ${sanctionsHash}`);
 
         // F. Notify Logic
         let notify = false;
@@ -314,25 +360,23 @@ async function checkUpdates() {
         let notificationBody = 'Nuevos datos disponibles.';
 
         // Reminder Logic (24h before)
-        if (nextRoundDate && !lastState.reminderSent && nextRoundNum) { // Check if we have a future date and haven't sent it
-            // Ensure we don't send reminder if the round is already current/locked (handled above)
-            if (globalStatus !== 'current' && globalStatus !== 'locked' && globalStatus !== 'custom_locked') {
-                const now = new Date();
-                const diffMs = nextRoundDate - now;
-                const diffHours = diffMs / (1000 * 60 * 60);
+        if (nextRoundDate && !lastState.reminderSent && nextRoundNum && globalStatus !== 'current' && globalStatus !== 'locked' && globalStatus !== 'custom_locked') {
+            const now = new Date();
+            const diffMs = nextRoundDate - now;
+            const diffHours = diffMs / (1000 * 60 * 60);
 
-                if (diffHours > 0 && diffHours < 24) {
-                    notify = true;
-                    notificationTitle = `Recordatorio J${nextRoundNum}`;
-                    notificationBody = `⏳ La Jornada ${nextRoundNum} empieza en menos de 24h (${Math.round(diffHours)}h). ¡Revisa tus capitanes!`;
-                    lastState.reminderSent = true;
-                }
+            if (diffHours > 0 && diffHours < 24) {
+                notify = true;
+                notificationTitle = `Recordatorio J${nextRoundNum}`;
+                notificationBody = `⏳ La Jornada ${nextRoundNum} empieza en menos de 24h (${Math.round(diffHours)}h). ¡Revisa tus capitanes!`;
+                lastState.reminderSent = true;
             }
         }
 
-        if (!lastState.round || lastState.round !== globalRoundNum) {
-            // New Round Detected (Jumps from X to Y)
-            // Usually happens when previous round closes and next one becomes active/pending
+        if (notify) {
+            // Priority notification (Reminder)
+        } else if (!lastState.round || lastState.round !== globalRoundNum) {
+            // New Round Detected
             notify = true;
             notificationTitle = `Jornada ${globalRoundNum}`;
             if (globalStatus === 'current') {
@@ -340,33 +384,13 @@ async function checkUpdates() {
                 lastState.reminderSent = false;
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
                 notificationBody = `⏳ Jornada ${globalRoundNum} bloqueada. ¡Revisa tus capitanes! Queda poco.`;
+                lastState.reminderSent = false;
             } else {
                 notificationBody = `Nueva Jornada ${globalRoundNum} detectada (${globalStatus}).`;
                 lastState.reminderSent = false;
             }
-        }
-
-        // Reminder Logic (24h before)
-        if (nextRoundDate && !lastState.reminderSent && nextRoundNum) { // Check if we have a future date and haven't sent it
-            // Ensure we don't send reminder if the round is already current/locked (handled above)
-            if (globalStatus !== 'current' && globalStatus !== 'locked' && globalStatus !== 'custom_locked') {
-                const now = new Date();
-                const diffMs = nextRoundDate - now;
-                const diffHours = diffMs / (1000 * 60 * 60);
-
-                if (diffHours > 0 && diffHours < 24) {
-                    notify = true;
-                    notificationTitle = `Recordatorio J${nextRoundNum}`;
-                    notificationBody = `⏳ La Jornada ${nextRoundNum} empieza en menos de 24h (${Math.round(diffHours)}h). ¡Revisa tus capitanes!`;
-                    lastState.reminderSent = true;
-                }
-            }
-        }
-
-        if (notify) {
-            // Logic handled below
         } else if (lastState.status !== globalStatus) {
-            // Status Change within same round
+            // Status Change
             notify = true;
             notificationTitle = `Jornada ${globalRoundNum}`;
             if (globalStatus === 'current') {
@@ -374,17 +398,55 @@ async function checkUpdates() {
                 lastState.reminderSent = false;
             } else if (globalStatus === 'closed') {
                 notificationBody = `🏁 Jornada ${globalRoundNum} finalizada. Consulta los resultados finales.`;
+
+                // UPDATE HISTORY ON CLOSE
+                console.log('Round Closed. Updating Captain History...');
+                for (const res of allResults) {
+                    if (res.req && res.capName && res.capName !== 'N' && res.capName !== 'X') {
+                        const teamRef = db.collection('captain_history').doc(res.req.teamId);
+                        try {
+                            await db.runTransaction(async (t) => {
+                                const doc = await t.get(teamRef);
+                                const data = doc.exists ? doc.data() : { counts: {} };
+                                if (!data.counts) data.counts = {};
+
+                                // Only increment if not already processed for this round?
+                                // We use lastProcessedRound to prevent double counting
+                                if (!data.lastProcessedRound || data.lastProcessedRound < globalRoundNum) {
+                                    data.counts[res.capName] = (data.counts[res.capName] || 0) + 1;
+                                    data.lastProcessedRound = globalRoundNum;
+                                    t.set(teamRef, data, { merge: true });
+                                }
+                            });
+                        } catch (e) {
+                            console.error(`Failed to update history for ${res.req.teamId}:`, e.message);
+                        }
+                    }
+                }
+
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
                 notificationBody = `⏳ Jornada ${globalRoundNum} bloqueada. ¡Última oportunidad para capitanes!`;
             } else {
                 notificationBody = `Estado actualizado: ${globalStatus}.`;
             }
-        } else if (lastState.hash && lastState.hash !== masterHash && globalStatus === 'current') {
-            // Score/Lineup Updates during live round
-            notify = true;
-            notificationTitle = `Jornada ${globalRoundNum} en directo`;
-            notificationBody = `Han cambiado las puntuaciones o alineaciones.`;
+        } else if (globalStatus === 'current') {
+            // Live Updates: Granular Checks
+            if (lastState.pointsHash !== pointsHash) {
+                notify = true;
+                notificationTitle = `Goles / Puntos (J${globalRoundNum})`;
+                notificationBody = `⚽ Han cambiado las puntuaciones globales.`;
+            } else if (lastState.sanctionsHash !== sanctionsHash) {
+                notify = true;
+                notificationTitle = `Sanciones y Tarjetas (J${globalRoundNum})`;
+                if (capSanctionsHash && (!lastState.sanctionsHash || !lastState.sanctionsHash.includes(capSanctionsHash))) {
+                    notificationBody = `⚠️ Sanción por Capitanía detectada: ${trunc(capSanctionsHash, 50)}`;
+                } else {
+                    notificationBody = `🟥🟨 Nuevas tarjetas o sanciones detectadas.`;
+                }
+            }
         }
+
+        function trunc(str, n) { return (str.length > n) ? str.substr(0, n - 1) + '...' : str; }
 
         // --- SUBSCRIBE TOKENS TO TOPIC ---
         try {
@@ -420,18 +482,22 @@ async function checkUpdates() {
             await docRef.set({
                 round: globalRoundNum,
                 status: globalStatus,
-                hash: masterHash,
+                hash: masterString,
+                pointsHash: pointsHash,
+                sanctionsHash: sanctionsHash,
                 lastUpdate: new Date().toISOString(),
                 reminderSent: lastState.reminderSent || false
             });
         } else {
             console.log('No significant changes.');
-            // Always update state if hash or reminder status changed
-            if (lastState.hash !== masterHash || lastState.reminderSent) {
+            // Always update state if hash or reminder status changed to keep sync
+            if (lastState.hash !== masterString || lastState.pointsHash !== pointsHash || lastState.sanctionsHash !== sanctionsHash || lastState.reminderSent) {
                 await docRef.set({
                     round: globalRoundNum,
                     status: globalStatus,
-                    hash: masterHash,
+                    hash: masterString,
+                    pointsHash: pointsHash,
+                    sanctionsHash: sanctionsHash,
                     lastUpdate: new Date().toISOString(),
                     reminderSent: lastState.reminderSent || false
                 }, { merge: true });
