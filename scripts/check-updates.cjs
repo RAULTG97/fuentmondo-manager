@@ -89,8 +89,15 @@ async function checkUpdates() {
             answer: {}
         });
         const rounds = metaResp.data.answer || metaResp.data;
-        // activeRound is the CURRENT one, or the last one if season ended/paused
-        const activeRound = rounds.find(r => r.status === 'current') || rounds[rounds.length - 1];
+        if (!rounds || rounds.length === 0) throw new Error('No rounds found in API response.');
+
+        // Sort by number descending to always get the LATEST round
+        rounds.sort((a, b) => Number(b.number) - Number(a.number));
+
+        console.log(`  Found ${rounds.length} rounds. Latest: J${rounds[0].number} (${rounds[0].status})`);
+
+        // Target is simply the latest round
+        const activeRound = rounds[0];
 
         const globalRoundNum = Number(activeRound.number);
         const globalRoundId = activeRound.id || activeRound._id;
@@ -382,8 +389,8 @@ async function checkUpdates() {
 
             if (diffHours > 0 && diffHours < 24) {
                 notify = true;
-                notificationTitle = `Recordatorio J${nextRoundNum}`;
-                notificationBody = `⏳ La Jornada ${nextRoundNum} empieza en menos de 24h (${Math.round(diffHours)}h). ¡Revisa tus capitanes!`;
+                notificationTitle = `⏳ J${nextRoundNum}: ¡Solo 24h!`;
+                notificationBody = `¡Aviso importante! La Jornada ${nextRoundNum} empieza en unas ${Math.round(diffHours)} horitas. No te olvides de poner a punto tus capitanes. ⚡`;
                 lastState.reminderSent = true;
             }
         }
@@ -393,26 +400,26 @@ async function checkUpdates() {
         } else if (!lastState.round || lastState.round !== globalRoundNum) {
             // New Round Detected
             notify = true;
-            notificationTitle = `Jornada ${globalRoundNum}`;
+            notificationTitle = `⚽ ¡Novedades de la J${globalRoundNum}!`;
             if (globalStatus === 'current') {
-                notificationBody = `⚽ ¡Arranca la Jornada ${globalRoundNum}!`;
+                notificationBody = `¡Ya ha empezado la Jornada ${globalRoundNum}! La pelota ya rueda... ¡mucha suerte! 🍀`;
                 lastState.reminderSent = false;
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
-                notificationBody = `⏳ Jornada ${globalRoundNum} bloqueada. ¡Revisa tus capitanes! Queda poco.`;
+                notificationBody = `¡Atención! La Jornada ${globalRoundNum} acaba de bloquearse. Espero que hayas elegido bien a tus capitanes... 😉`;
                 lastState.reminderSent = false;
             } else {
-                notificationBody = `Nueva Jornada ${globalRoundNum} detectada (${globalStatus}).`;
+                notificationBody = `Hemos detectado que la Jornada ${globalRoundNum} está ahora en estado: ${globalStatus}.`;
                 lastState.reminderSent = false;
             }
         } else if (lastState.status !== globalStatus) {
             // Status Change
             notify = true;
-            notificationTitle = `Jornada ${globalRoundNum}`;
+            notificationTitle = `Jornada ${globalRoundNum}: Cambio de estado`;
             if (globalStatus === 'current') {
-                notificationBody = `⚽ ¡Arranca la Jornada ${globalRoundNum}!`;
+                notificationBody = `¡Arranca la acción en la J${globalRoundNum}! Revisa puntuaciones en vivo. 🚀`;
                 lastState.reminderSent = false;
             } else if (globalStatus === 'closed') {
-                notificationBody = `🏁 Jornada ${globalRoundNum} finalizada. Consulta los resultados finales.`;
+                notificationBody = `🏁 La Jornada ${globalRoundNum} ha terminado oficialmente. ¡Pásate a ver cómo ha quedado la cosa! 🏆`;
 
                 // UPDATE HISTORY ON CLOSE
                 console.log('Round Closed. Updating Captain History...');
@@ -446,23 +453,23 @@ async function checkUpdates() {
                 }
 
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
-                notificationBody = `⏳ Jornada ${globalRoundNum} bloqueada. ¡Última oportunidad para capitanes!`;
+                notificationBody = `¡Cerrado el mercado! La Jornada ${globalRoundNum} ya está bloqueada. Tira de los hilos... 🧵`;
             } else {
-                notificationBody = `Estado actualizado: ${globalStatus}.`;
+                notificationBody = `Parece que la J${globalRoundNum} ha pasado a estar: ${globalStatus}.`;
             }
         } else if (globalStatus === 'current') {
             // Live Updates: Granular Checks
             if (lastState.pointsHash !== pointsHash) {
                 notify = true;
-                notificationTitle = `Goles / Puntos (J${globalRoundNum})`;
-                notificationBody = `⚽ Han cambiado las puntuaciones globales.`;
+                notificationTitle = `⚽ ¡Gooool / Puntos! (J${globalRoundNum})`;
+                notificationBody = `¡Hay movimiento en el marcador! Se han actualizado los puntos de la jornada. Échale un ojo. 👀`;
             } else if (lastState.sanctionsHash !== sanctionsHash) {
                 notify = true;
-                notificationTitle = `Sanciones y Tarjetas (J${globalRoundNum})`;
+                notificationTitle = `⚠️ Sanciones (J${globalRoundNum})`;
                 if (capSanctionsHash && (!lastState.sanctionsHash || !lastState.sanctionsHash.includes(capSanctionsHash))) {
-                    notificationBody = `⚠️ Sanción por Capitanía detectada: ${trunc(capSanctionsHash, 50)}`;
+                    notificationBody = `¡Ojo! Sanción detectada: ${trunc(capSanctionsHash, 50)}. 🟥`;
                 } else {
-                    notificationBody = `🟥🟨 Nuevas tarjetas o sanciones detectadas.`;
+                    notificationBody = `¡Vuelan las tarjetas! Hay novedades en las sanciones y tarjetas de la jornada. 🟥🟨`;
                 }
             }
         }
