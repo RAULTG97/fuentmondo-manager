@@ -88,21 +88,24 @@ async function checkUpdates() {
             query: { championshipId: masterCtx.id, userteamId: masterCtx.userTeamId },
             answer: {}
         });
-        const rounds = metaResp.data.answer || metaResp.data;
-        if (!rounds || rounds.length === 0) throw new Error('No rounds found in API response.');
+        const roundsList = metaResp.data.answer || metaResp.data;
+        if (!roundsList || roundsList.length === 0) throw new Error('No rounds found in API response.');
 
-        // Sort by number descending to always get the LATEST round
-        rounds.sort((a, b) => Number(b.number) - Number(a.number));
+        // Sort by number descending
+        roundsList.sort((a, b) => Number(b.number) - Number(a.number));
 
-        console.log(`  Found ${rounds.length} rounds. Latest: J${rounds[0].number} (${rounds[0].status})`);
+        // Let's filter out 'future' rounds for targeting current/last activity
+        const relevantRounds = roundsList.filter(r => r.status && r.status !== 'future');
 
-        // Target is simply the latest round
-        const activeRound = rounds[0];
+        // Target the highest-numbered non-future round
+        const activeRound = relevantRounds[0] || roundsList[0];
 
         const globalRoundNum = Number(activeRound.number);
         const globalRoundId = activeRound.id || activeRound._id;
         const globalStatus = activeRound.status;
-        console.log(`Global Target: J${globalRoundNum} (${globalStatus})`);
+
+        console.log(`  Found ${roundsList.length} total rounds.`);
+        console.log(`  Targeting J${globalRoundNum} (Estado: ${globalStatus})`);
 
         // 2. Get Schedule from Active Championships (for Next Round Date)
         let nextRoundDate = null;
@@ -396,43 +399,53 @@ async function checkUpdates() {
         }
 
         if (notify) {
-            // Priority notification (Reminder)
+            // Logic handled above (Reminder)
         } else if (!lastState.round || lastState.round !== globalRoundNum) {
-            // New Round Detected
+            // New Week / Round Detected
             notify = true;
-            notificationTitle = `⚽ ¡Novedades de la J${globalRoundNum}!`;
-            if (globalStatus === 'current') {
-                notificationBody = `¡Ya ha empezado la Jornada ${globalRoundNum}! La pelota ya rueda... ¡mucha suerte! 🍀`;
+            notificationTitle = `⚽ ¡Nueva Jornada: J${globalRoundNum}!`;
+
+            if (globalStatus === 'current' || globalStatus === 'running') {
+                notificationBody = `¡Ya está aquí la Jornada ${globalRoundNum}! Que ruede el balón y que la suerte os acompañe. 🍀`;
                 lastState.reminderSent = false;
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
-                notificationBody = `¡Atención! La Jornada ${globalRoundNum} acaba de bloquearse. Espero que hayas elegido bien a tus capitanes... 😉`;
-                lastState.reminderSent = false;
-            } else {
-                notificationBody = `Hemos detectado que la Jornada ${globalRoundNum} está ahora en estado: ${globalStatus}.`;
-                lastState.reminderSent = false;
-            }
-        } else if (lastState.status !== globalStatus) {
-            // Status Change
-            notify = true;
-            notificationTitle = `Jornada ${globalRoundNum}: Cambio de estado`;
-            if (globalStatus === 'current') {
-                notificationBody = `¡Arranca la acción en la J${globalRoundNum}! Revisa puntuaciones en vivo. 🚀`;
+                notificationBody = `¡Ojo! La Jornada ${globalRoundNum} ya se ha bloqueado. ¡Espero que vuestros capitanes estén listos para el combate! 😉`;
                 lastState.reminderSent = false;
             } else if (globalStatus === 'closed') {
-                let body = `🏁 La Jornada ${globalRoundNum} ha terminado oficialmente. ¡Pásate a ver cómo ha quedado la cosa! 🏆`;
+                notificationBody = `¡Damos carpetazo a la Jornada ${globalRoundNum}! Ya podéis consultar cómo ha quedado todo. 🏁`;
+            } else {
+                notificationBody = `¡Se empieza a mover la Jornada ${globalRoundNum}! De momento está "${globalStatus}".`;
+            }
+        } else if (lastState.status !== globalStatus) {
+            // Transition between status (e.g. from locked to running)
+            notify = true;
+            const statusMap = {
+                'running': 'en juego',
+                'current': 'en directo',
+                'locked': 'bloqueada',
+                'custom_locked': 'bloqueada',
+                'closed': 'finalizada',
+                'future': 'próxima'
+            };
+            const naturalStatus = statusMap[globalStatus] || globalStatus;
+            notificationTitle = `Jornada ${globalRoundNum}: Cambio de estado 🔄`;
+
+            if (globalStatus === 'current' || globalStatus === 'running') {
+                notificationBody = `¡Empieza lo bueno! La Jornada ${globalRoundNum} ya está ${naturalStatus}. ¡A por todas! 🚀`;
+            } else if (globalStatus === 'closed') {
+                let body = `🏁 ¡Pitido final en la Jornada ${globalRoundNum}! Ya podéis ver los puntos definitivos. 🏆`;
                 if (capSanctionsHash) {
-                    body += `\n\n⚠️ Sanciones detectadas: ${trunc(capSanctionsHash, 100)}`;
+                    body += `\n\n⚠️ ¡Atención! Tenemos estas sanciones de capitanes:\n${trunc(capSanctionsHash, 100)}`;
                 }
                 notificationBody = body;
 
-                // UPDATE HISTORY ON CLOSE
-                console.log('Round Closed. Updating Captain History...');
+                // --- RESTORED HISTORY UPDATE LOGIC ---
+                console.log('Round Closed. Updating Captain History in Firestore...');
                 if (CONFIG.DRY_RUN) {
                     console.log('  [DRY RUN] Skipping history write.');
                 } else {
                     for (const res of allResults) {
                         if (res.req && res.capName && res.capName !== 'N' && res.capName !== 'X') {
-                            // Use Team Name as key
                             const teamKey = res.req.teamName ? res.req.teamName.trim() : res.req.teamId;
                             const teamRef = db.collection('captain_history').doc(teamKey);
                             try {
@@ -440,9 +453,6 @@ async function checkUpdates() {
                                     const doc = await t.get(teamRef);
                                     const data = doc.exists ? doc.data() : { counts: {} };
                                     if (!data.counts) data.counts = {};
-
-                                    // Only increment if not already processed for this round?
-                                    // We use lastProcessedRound to prevent double counting
                                     if (!data.lastProcessedRound || data.lastProcessedRound < globalRoundNum) {
                                         data.counts[res.capName] = (data.counts[res.capName] || 0) + 1;
                                         data.lastProcessedRound = globalRoundNum;
@@ -450,28 +460,27 @@ async function checkUpdates() {
                                     }
                                 });
                             } catch (e) {
-                                console.error(`Failed to update history for ${teamKey}:`, e.message);
+                                console.error(`  Error historizando ${teamKey}:`, e.message);
                             }
                         }
                     }
                 }
-
             } else if (globalStatus === 'custom_locked' || globalStatus === 'locked') {
-                notificationBody = `¡Cerrado el mercado! La Jornada ${globalRoundNum} ya está bloqueada. Tira de los hilos... 🧵`;
+                notificationBody = `¡Atención! La Jornada ${globalRoundNum} se ha bloqueado. ¡Que Dios reparta suerte! 🤞`;
             } else {
-                notificationBody = `Parece que la J${globalRoundNum} ha pasado a estar: ${globalStatus}.`;
+                notificationBody = `La Jornada ${globalRoundNum} ha pasado a estar "${naturalStatus}".`;
             }
-        } else if (globalStatus === 'current') {
-            // Live Updates: Granular Checks
+        } else if (globalStatus === 'current' || globalStatus === 'running') {
+            // Live updates while playing
             if (lastState.pointsHash !== pointsHash) {
                 notify = true;
-                notificationTitle = `⚽ ¡Gooool / Puntos! (J${globalRoundNum})`;
-                notificationBody = `¡Hay movimiento en el marcador! Se han actualizado los puntos de la jornada. Échale un ojo. 👀`;
+                notificationTitle = `⚽ ¡Gooool! - J${globalRoundNum}`;
+                notificationBody = `¡Hay movimiento! Se acaban de actualizar los puntos. ¡Echadle un ojo al marcador! 👀`;
             } else if (lastState.sanctionsHash !== sanctionsHash) {
                 notify = true;
-                notificationTitle = `⚠️ Sanciones (J${globalRoundNum})`;
+                notificationTitle = `⚠️ Alerta de Sanciones - J${globalRoundNum}`;
                 if (capSanctionsHash && (!lastState.sanctionsHash || !lastState.sanctionsHash.includes(capSanctionsHash))) {
-                    notificationBody = `¡Ojo! Sanción detectada: ${trunc(capSanctionsHash, 50)}. 🟥`;
+                    notificationBody = `¡Cuidado! Tenemos nuevas sanciones de capitanes: ${trunc(capSanctionsHash, 80)}. 🟥`;
                 } else {
                     notificationBody = `¡Vuelan las tarjetas! Hay novedades en las sanciones y tarjetas de la jornada. 🟥🟨`;
                 }
