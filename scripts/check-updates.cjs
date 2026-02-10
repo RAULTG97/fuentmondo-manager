@@ -10,14 +10,16 @@
  */
 const admin = require('firebase-admin');
 const axios = require('axios');
+try { require('dotenv').config(); } catch (e) { /* ignore in prod */ }
 
 // 1. Initialize Firebase Admin
 let db, msg;
 const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+
 const serviceAccount = serviceAccountRaw ? JSON.parse(serviceAccountRaw) : null;
 
 if (!serviceAccount || !serviceAccount.project_id) {
-    console.error('Missing or invalid FIREBASE_SERVICE_ACCOUNT env var');
+    console.error('Missing or invalid FIREBASE_SERVICE_ACCOUNT env var or local key file');
     process.exit(1);
 }
 
