@@ -538,7 +538,17 @@ async function checkUpdates() {
         if (notify) {
             console.log('Sending live notification...');
             const message = {
-                notification: { title: notificationTitle, body: notificationBody },
+                notification: {
+                    title: notificationTitle,
+                    body: notificationBody,
+                    icon: '/fuentmondo-manager/logo.jpeg',
+                    tag: 'fuentmondo-update'
+                },
+                webpush: {
+                    fcmOptions: {
+                        link: '/fuentmondo-manager/'
+                    }
+                },
                 topic: 'general'
             };
             await msg.send(message);
