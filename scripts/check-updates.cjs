@@ -541,10 +541,12 @@ async function checkUpdates() {
                 notification: {
                     title: notificationTitle,
                     body: notificationBody,
-                    icon: '/fuentmondo-manager/logo.jpeg',
-                    tag: 'fuentmondo-update'
                 },
                 webpush: {
+                    notification: {
+                        icon: '/fuentmondo-manager/logo.jpeg',
+                        tag: 'fuentmondo-update'
+                    },
                     fcmOptions: {
                         link: '/fuentmondo-manager/'
                     }
