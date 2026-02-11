@@ -178,38 +178,67 @@ export const CopaSanctionsService = {
             result.captainHistory[teamId] = { name: teamName, captainHistory: [] };
         });
 
-        // 2. Identify and gather matches to process
+
+        // 2. Group rounds by base number (e.g., 1.1 and 1.2 -> eliminatoria 1)
+        const eliminatoriaGroups = new Map(); // baseRoundNum -> { rounds: [], allMatches: [] }
+
         rounds.forEach(round => {
-            if (!round.matches || round.matches.length === 0) return;
+            const baseNum = Math.floor(round.number || 0);
+            if (!eliminatoriaGroups.has(baseNum)) {
+                eliminatoriaGroups.set(baseNum, { rounds: [], allMatches: [], roundIds: [] });
+            }
+            const group = eliminatoriaGroups.get(baseNum);
+            group.rounds.push(round);
+            group.allMatches.push(...(round.matches || []));
 
-            const effectiveRoundId = round.id || round._id || round.roundId;
+            // Collect all roundIds from this round
+            const rIds = Array.isArray(round.roundIds) ? round.roundIds :
+                (round.roundId ? [round.roundId] :
+                    (round.id ? [round.id] :
+                        (round._id ? [round._id] : [])));
+            group.roundIds.push(...rIds);
+        });
 
-            if (!effectiveRoundId) return;
+        // 3. Process each eliminatoria group
+        eliminatoriaGroups.forEach((group, baseRoundNum) => {
+            const { rounds: roundsInGroup, allMatches } = group;
 
-            round.matches.forEach(match => {
-                if (match.home?.team && match.away?.team) {
-                    // Detect if this match has multiple legs (based on score array length or roundIds)
-                    // If round has multiple associated roundIds, or match has a specific legs array
-                    const legs = match.legs || [effectiveRoundId]; // Fallback if no specific legs defined
+            // For Copa, each match already represents the full eliminatoria with scores for both legs
+            // The round object has a 'rounds' array with roundIds for each leg
+            allMatches.forEach((match) => {
+                if (!match.home?.team || !match.away?.team) return; // Skip byes
 
-                    legs.forEach((legRoundId, legIdx) => {
-                        matchesToProcess.push({
-                            match,
-                            roundNum: round.number,
-                            legNum: legIdx + 1,
-                            effectiveRoundId: legRoundId
-                        });
+                // Find which round this match belongs to
+                const matchRound = roundsInGroup.find(r => r.matches?.includes(match));
+                if (!matchRound) return;
+
+                // Get the rounds array from the round object (contains roundIds for both legs)
+                const legRoundIds = matchRound.rounds || [];
+
+                // Process each leg separately
+                legRoundIds.forEach((legRoundId, legIdx) => {
+                    const legNum = legIdx + 1;
+                    const label = `${baseRoundNum}.${legNum}`;
+
+                    matchesToProcess.push({
+                        match,
+                        roundNum: baseRoundNum,
+                        legNum,
+                        legIdx, // 0 for IDA, 1 for VUELTA
+                        roundLabel: label,
+                        effectiveRoundId: legRoundId
                     });
-                }
+                });
             });
         });
+
 
 
         // 3. Fetch Lineups with Concurrency Control
         const CHUNK_SIZE = 5;
         for (let i = 0; i < matchesToProcess.length; i += CHUNK_SIZE) {
             const chunk = matchesToProcess.slice(i, i + CHUNK_SIZE);
-            await Promise.all(chunk.map(async ({ match, roundNum, effectiveRoundId, legNum }) => {
+            await Promise.all(chunk.map(async ({ match, roundNum, effectiveRoundId, legNum, roundLabel }) => {
                 if (!match) return;
                 try {
                     const homeId = match.home.team.id || match.home.team._id;
@@ -221,31 +250,34 @@ export const CopaSanctionsService = {
                     const awayPlayers = CopaSanctionsService._extractLineup(awayL);
 
                     // A. Update Captains History
-                    CopaSanctionsService._recordCaptain(result, homeId, match.home.team.name, homePlayers, `${roundNum}.${legNum}`);
-                    CopaSanctionsService._recordCaptain(result, awayId, match.away.team.name, awayPlayers, `${roundNum}.${legNum}`);
+                    CopaSanctionsService._recordCaptain(result, homeId, match.home.team.name, homePlayers, roundLabel);
+                    CopaSanctionsService._recordCaptain(result, awayId, match.away.team.name, awayPlayers, roundLabel);
 
                     // B. Store Lineups for UI detail view
-                    CopaSanctionsService._recordLineup(result, homeId, match.home.team.name, homePlayers, roundNum, CopaSanctionsService._sumLineup(homePlayers));
-                    CopaSanctionsService._recordLineup(result, awayId, match.away.team.name, awayPlayers, roundNum, CopaSanctionsService._sumLineup(awayPlayers));
+                    CopaSanctionsService._recordLineup(result, homeId, match.home.team.name, homePlayers, roundLabel, CopaSanctionsService._sumLineup(homePlayers));
+                    CopaSanctionsService._recordLineup(result, awayId, match.away.team.name, awayPlayers, roundLabel, CopaSanctionsService._sumLineup(awayPlayers));
 
                     // C. Round Sanctions (Repetitions, Same Club)
+                    // Repetitions use the base round number to track "current round" context
                     const roundSanctions = [];
-                    CopaSanctionsService._checkMatchupRepetitions({ team: match.home.team, lineup: homePlayers }, { team: match.away.team, lineup: awayPlayers }, roundSanctions, roundNum);
-                    CopaSanctionsService._checkSameClubSanction({ team: match.home.team, lineup: homePlayers }, roundSanctions, roundNum);
-                    CopaSanctionsService._checkSameClubSanction({ team: match.away.team, lineup: awayPlayers }, roundSanctions, roundNum);
+                    CopaSanctionsService._checkMatchupRepetitions({ team: match.home.team, lineup: homePlayers }, { team: match.away.team, lineup: awayPlayers }, roundSanctions, roundNum, legNum);
+                    CopaSanctionsService._checkSameClubSanction({ team: match.home.team, lineup: homePlayers }, roundSanctions, roundNum, legNum);
+                    CopaSanctionsService._checkSameClubSanction({ team: match.away.team, lineup: awayPlayers }, roundSanctions, roundNum, legNum);
 
                     result.sanctions.push(...roundSanctions);
 
                     // Store scores/performances for round-level calculations
+                    // Use roundLabel as key to keep legs distinct in performances
+                    const sanctionKey = roundLabel;
                     if (!result.roundScores) result.roundScores = {};
-                    if (!result.roundScores[roundNum]) result.roundScores[roundNum] = [];
+                    if (!result.roundScores[sanctionKey]) result.roundScores[sanctionKey] = [];
                     const hScore = CopaSanctionsService._sumLineup(homePlayers);
                     const aScore = CopaSanctionsService._sumLineup(awayPlayers);
-                    result.roundScores[roundNum].push({ teamId: homeId, name: match.home.team.name, score: hScore });
-                    result.roundScores[roundNum].push({ teamId: awayId, name: match.away.team.name, score: aScore });
+                    result.roundScores[sanctionKey].push({ teamId: homeId, name: match.home.team.name, score: hScore });
+                    result.roundScores[sanctionKey].push({ teamId: awayId, name: match.away.team.name, score: aScore });
 
                     if (!result.roundPerformances) result.roundPerformances = {};
-                    if (!result.roundPerformances[roundNum]) result.roundPerformances[roundNum] = { captains: [], players: [] };
+                    if (!result.roundPerformances[sanctionKey]) result.roundPerformances[sanctionKey] = { captains: [], players: [] };
 
                     const isCaptain = (p) => {
                         const val = !!p.captain || p.role === 'captain' || p.cpt;
@@ -255,7 +287,7 @@ export const CopaSanctionsService = {
 
                     const hCap = homePlayers.find(isCaptain);
                     if (hCap) {
-                        result.roundPerformances[roundNum].captains.push({
+                        result.roundPerformances[sanctionKey].captains.push({
                             teamId: homeId,
                             name: match.home.team.name,
                             captainName: hCap.name || hCap.playerName || 'Capitán',
@@ -265,7 +297,7 @@ export const CopaSanctionsService = {
 
                     const aCap = awayPlayers.find(isCaptain);
                     if (aCap) {
-                        result.roundPerformances[roundNum].captains.push({
+                        result.roundPerformances[sanctionKey].captains.push({
                             teamId: awayId,
                             name: match.away.team.name,
                             captainName: aCap.name || aCap.playerName || 'Capitán',
@@ -273,13 +305,13 @@ export const CopaSanctionsService = {
                         });
                     }
 
-                    homePlayers.forEach(p => result.roundPerformances[roundNum].players.push({
+                    homePlayers.forEach(p => result.roundPerformances[sanctionKey].players.push({
                         teamId: homeId,
                         name: match.home.team.name,
                         playerName: p.name || p.playerName || 'Jugador',
                         points: p.points || 0
                     }));
-                    awayPlayers.forEach(p => result.roundPerformances[roundNum].players.push({
+                    awayPlayers.forEach(p => result.roundPerformances[sanctionKey].players.push({
                         teamId: awayId,
                         name: match.away.team.name,
                         playerName: p.name || p.playerName || 'Jugador',
@@ -293,19 +325,77 @@ export const CopaSanctionsService = {
             await delay(100);
         }
 
-        // 4. Post-Process Round-Level Sanctions
+        // 4. Post-Process Round-Level Sanctions (Aggregate by Eliminatoria)
+        // Group scores and performances by base round number
+        const eliminatoriaScores = {}; // baseRoundNum -> [{ teamId, name, totalScore }]
+        const eliminatoriaCaptains = {}; // baseRoundNum -> [{ teamId, name, captainName, totalPoints }]
+        const eliminatoriaPlayers = {}; // baseRoundNum -> [{ teamId, name, playerName, totalPoints }]
+
         if (result.roundScores) {
-            Object.keys(result.roundScores).forEach(rNum => {
-                CopaSanctionsService._checkWorstScores(result.roundScores[rNum], result.sanctions, Number(rNum));
+            Object.keys(result.roundScores).forEach(roundLabel => {
+                const baseRound = Math.floor(parseFloat(roundLabel));
+                if (!eliminatoriaScores[baseRound]) eliminatoriaScores[baseRound] = {};
+
+                result.roundScores[roundLabel].forEach(({ teamId, name, score }) => {
+                    if (!eliminatoriaScores[baseRound][teamId]) {
+                        eliminatoriaScores[baseRound][teamId] = { teamId, name, totalScore: 0 };
+                    }
+                    eliminatoriaScores[baseRound][teamId].totalScore += score;
+                });
             });
         }
+
         if (result.roundPerformances) {
-            Object.keys(result.roundPerformances).forEach(rNum => {
-                const roundPerf = result.roundPerformances[rNum];
-                CopaSanctionsService._checkWorstCaptain(roundPerf.captains, result.sanctions, Number(rNum));
-                CopaSanctionsService._checkWorstPlayer(roundPerf.players, result.sanctions, Number(rNum));
+            Object.keys(result.roundPerformances).forEach(roundLabel => {
+                const baseRound = Math.floor(parseFloat(roundLabel));
+                const roundPerf = result.roundPerformances[roundLabel];
+
+                // Aggregate captains
+                if (!eliminatoriaCaptains[baseRound]) eliminatoriaCaptains[baseRound] = {};
+                roundPerf.captains.forEach(({ teamId, name, captainName, points }) => {
+                    const key = `${teamId}_${captainName}`;
+                    if (!eliminatoriaCaptains[baseRound][key]) {
+                        eliminatoriaCaptains[baseRound][key] = { teamId, name, captainName, totalPoints: 0 };
+                    }
+                    eliminatoriaCaptains[baseRound][key].totalPoints += points;
+                });
+
+                // Aggregate players
+                if (!eliminatoriaPlayers[baseRound]) eliminatoriaPlayers[baseRound] = {};
+                roundPerf.players.forEach(({ teamId, name, playerName, points }) => {
+                    const key = `${teamId}_${playerName}`;
+                    if (!eliminatoriaPlayers[baseRound][key]) {
+                        eliminatoriaPlayers[baseRound][key] = { teamId, name, playerName, totalPoints: 0 };
+                    }
+                    eliminatoriaPlayers[baseRound][key].totalPoints += points;
+                });
             });
         }
+
+        // Apply sanctions based on aggregated eliminatoria data
+        Object.keys(eliminatoriaScores).forEach(baseRound => {
+            const teamScoresArray = Object.values(eliminatoriaScores[baseRound]);
+            CopaSanctionsService._checkWorstScores(teamScoresArray.map(t => ({ name: t.name, score: t.totalScore })), result.sanctions, Number(baseRound), null);
+        });
+
+        Object.keys(eliminatoriaCaptains).forEach(baseRound => {
+            const captainsArray = Object.values(eliminatoriaCaptains[baseRound]).map(c => ({
+                name: c.name,
+                captainName: c.captainName,
+                points: c.totalPoints
+            }));
+            CopaSanctionsService._checkWorstCaptain(captainsArray, result.sanctions, Number(baseRound), null);
+        });
+
+        Object.keys(eliminatoriaPlayers).forEach(baseRound => {
+            const playersArray = Object.values(eliminatoriaPlayers[baseRound]).map(p => ({
+                name: p.name,
+                playerName: p.playerName,
+                points: p.totalPoints
+            }));
+            CopaSanctionsService._checkWorstPlayer(playersArray, result.sanctions, Number(baseRound), null);
+        });
+
 
         // 5. Sanction for Not Playing Round 1 & 2 (Byes in both)
         const playedInR1 = new Set();
@@ -335,7 +425,126 @@ export const CopaSanctionsService = {
             }
         });
 
-        // 6. Transform to teamStats format for UI
+
+        // 5.5 Check Captain Repetitions (New)
+        CopaSanctionsService._checkCaptainRepetitionSanctions(result);
+
+
+        // 6. Calculate Copa Status (Wins/Losses per Round & Elimination)
+        result.teamCopaStatus = {};
+
+        // Initialize status for all teams found
+        Object.keys(result.teamStats).forEach(teamId => {
+            result.teamCopaStatus[teamId] = {
+                id: teamId,
+                name: result.teamStats[teamId].name,
+                isEliminated: false,
+                eliminatedInRound: null,
+                currentStage: 'EN JUEGO', // Default
+                matchHistory: []
+            };
+        });
+
+        // Sort rounds to process in order
+        const sortedRounds = Object.keys(eliminatoriaScores)
+            .map(Number)
+            .sort((a, b) => a - b);
+
+        const getRoundName = (num) => {
+            switch (num) {
+                case 1: return '1/32 Final';
+                case 2: return '1/16 Final';
+                case 3: return 'Octavos';
+                case 4: return 'Cuartos';
+                case 5: return 'Semifinales';
+                case 6: return 'Final';
+                default: return `Ronda ${num}`;
+            }
+        };
+
+        sortedRounds.forEach(roundNum => {
+            const group = eliminatoriaGroups.get(roundNum);
+            if (!group) return;
+
+            const processedPairs = new Set();
+            const roundName = getRoundName(roundNum);
+
+            group.allMatches.forEach(m => {
+                const homeId = m.home?.team?.id || m.home?.team?._id;
+                const awayId = m.away?.team?.id || m.away?.team?._id;
+
+                if (!homeId || !awayId) return;
+
+                const pairKey = [homeId, awayId].sort().join('-');
+                if (processedPairs.has(pairKey)) return;
+                processedPairs.add(pairKey);
+
+                // Get aggregated scores
+                const homeScore = eliminatoriaScores[roundNum]?.[homeId]?.totalScore || 0;
+                const awayScore = eliminatoriaScores[roundNum]?.[awayId]?.totalScore || 0;
+
+                // Determine winner/loser
+                let homeRes = 'E';
+                let awayRes = 'E';
+                let winnerId = null;
+                let loserId = null;
+
+                // Check if round is finished (has scores)
+                // We use a heuristic: if totalScore > 0 or rounds are past
+                const isFinished = (homeScore > 0 || awayScore > 0);
+                // Better heuristic: check if individual matches have scores.
+                // eliminatoriaScores are sum of lineups. If lineups were fetched, we have scores.
+                // We fetched lineups for all matches that had teams.
+
+                if (isFinished) {
+                    if (homeScore > awayScore) {
+                        homeRes = 'V'; awayRes = 'D';
+                        winnerId = homeId; loserId = awayId;
+                    } else if (awayScore > homeScore) {
+                        homeRes = 'D'; awayRes = 'V';
+                        winnerId = awayId; loserId = homeId;
+                    }
+                }
+
+                const homeStat = result.teamCopaStatus[homeId];
+                const awayStat = result.teamCopaStatus[awayId];
+
+                if (homeStat && awayStat) {
+                    // Add history
+                    if (isFinished) {
+                        homeStat.matchHistory.push({
+                            round: roundNum,
+                            roundName: roundName,
+                            opponentName: m.away.team.name,
+                            result: homeRes,
+                            scoreAgg: `${homeScore}-${awayScore}`,
+                            isWinner: homeRes === 'V'
+                        });
+
+                        awayStat.matchHistory.push({
+                            round: roundNum,
+                            roundName: roundName,
+                            opponentName: m.home.team.name,
+                            result: awayRes,
+                            scoreAgg: `${awayScore}-${homeScore}`,
+                            isWinner: awayRes === 'V'
+                        });
+
+                        // Mark elimination
+                        if (loserId) {
+                            const loserStat = result.teamCopaStatus[loserId];
+                            if (!loserStat.isEliminated) { // Only mark once
+                                loserStat.isEliminated = true;
+                                loserStat.eliminatedInRound = roundNum;
+                                loserStat.currentStage = `Eliminado en ${roundName}`;
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        // 7. Transform to teamStats format for UI
         CopaSanctionsService._compileStats(result);
 
         return result;
@@ -366,8 +575,19 @@ export const CopaSanctionsService = {
             result.teamStats[teamId] = { id: teamId, name: teamName, total: 0, breakdown: [], captainHistory: [] };
         }
         const stats = result.teamStats[teamId];
+
+        // Parse roundNum to handle both numeric and string formats (e.g., "2.1", "2.2")
+        const parseRoundNum = (rn) => {
+            if (typeof rn === 'number') return rn;
+            if (typeof rn === 'string') return parseFloat(rn);
+            return 0;
+        };
+
+        const currentRoundValue = parseRoundNum(roundNum);
+        const existingRoundValue = stats.lastMatchData ? parseRoundNum(stats.lastMatchData.round) : -1;
+
         // Record the most recent lineup found (highest round number)
-        if (!stats.lastMatchData || roundNum >= stats.lastMatchData.round) {
+        if (!stats.lastMatchData || currentRoundValue >= existingRoundValue) {
             stats.lastMatchData = {
                 round: roundNum,
                 score: score,
@@ -423,7 +643,7 @@ export const CopaSanctionsService = {
         return lineup.reduce((sum, p) => sum + (p.points || 0), 0);
     },
 
-    _checkWorstScores(teamScores, sanctions, round) {
+    _checkWorstScores(teamScores, sanctions, round, leg = null) {
         if (teamScores.length < 3) return;
 
         // Sort ascending
@@ -440,7 +660,8 @@ export const CopaSanctionsService = {
                 team: t.name,
                 amount: 2,
                 reason: `Peor puntuación de la ronda (${score1} pts)`,
-                round
+                round,
+                leg
             }));
         }
 
@@ -452,7 +673,8 @@ export const CopaSanctionsService = {
                 team: t.name,
                 amount: 1.5,
                 reason: `2ª Peor puntuación de la ronda (${score2} pts)`,
-                round
+                round,
+                leg
             }));
         }
 
@@ -464,12 +686,13 @@ export const CopaSanctionsService = {
                 team: t.name,
                 amount: 1,
                 reason: `3ª Peor puntuación de la ronda (${score3} pts)`,
-                round
+                round,
+                leg
             }));
         }
     },
 
-    _checkWorstCaptain(allCaptains, sanctions, round) {
+    _checkWorstCaptain(allCaptains, sanctions, round, leg = null) {
         if (allCaptains.length === 0) return;
         const minPoints = Math.min(...allCaptains.map(c => c.points));
 
@@ -478,12 +701,13 @@ export const CopaSanctionsService = {
                 team: c.name,
                 amount: 1,
                 reason: `Capitán con peor puntuación (${c.captainName}, ${minPoints} pts)`,
-                round
+                round,
+                leg
             });
         });
     },
 
-    _checkWorstPlayer(allPlayers, sanctions, round) {
+    _checkWorstPlayer(allPlayers, sanctions, round, leg = null) {
         if (allPlayers.length === 0) return;
         const minPoints = Math.min(...allPlayers.map(p => p.points));
 
@@ -497,14 +721,15 @@ export const CopaSanctionsService = {
                     team: p.name,
                     amount: 1,
                     reason: `Jugador con peor puntuación de la jornada (${p.playerName}, ${minPoints} pts)`,
-                    round
+                    round,
+                    leg
                 });
                 sanctionedTeams.add(p.teamId);
             }
         });
     },
 
-    _checkMatchupRepetitions(home, away, sanctions, round) {
+    _checkMatchupRepetitions(home, away, sanctions, round, leg = null) {
         if (!home.team || !away.team) return;
 
         const getPId = (p) => String(p.id || p._id || p.playerId || '');
@@ -538,13 +763,15 @@ export const CopaSanctionsService = {
                     team: home.team.name,
                     amount: 2,
                     reason: `Capitán repetido (${playerName})`,
-                    round
+                    round,
+                    leg
                 });
                 sanctions.push({
                     team: away.team.name,
                     amount: 2,
                     reason: `Capitán repetido (${awayP.name})`,
-                    round
+                    round,
+                    leg
                 });
             } else if (isHomeCap || isAwayCap) {
                 // One is captain, the other is not
@@ -556,7 +783,8 @@ export const CopaSanctionsService = {
                     team: offender.team.name,
                     amount: 1,
                     reason: `Alineado jugador que es capitán rival (${playerName})`,
-                    round
+                    round,
+                    leg
                 });
             } else {
                 // Neither is captain -> Normal repeated player
@@ -567,19 +795,65 @@ export const CopaSanctionsService = {
                     team: home.team.name,
                     amount: 1,
                     reason: `Jugador repetido (${playerName})`,
-                    round
+                    round,
+                    leg
                 });
                 sanctions.push({
                     team: away.team.name,
                     amount: 1,
                     reason: `Jugador repetido (${awayP.name})`,
-                    round
+                    round,
+                    leg
                 });
             }
         });
     },
 
-    _checkSameClubSanction(side, sanctions, round) {
+    _checkCaptainRepetitionSanctions(result) {
+        Object.keys(result.captainHistory).forEach(teamId => {
+            const teamData = result.captainHistory[teamId];
+            const history = teamData.captainHistory;
+            const captainUsageCount = new Map(); // player -> usage count
+
+            // Sort by round number just in case
+            history.sort((a, b) => parseFloat(a.round) - parseFloat(b.round));
+
+            // First pass: count total usages
+            history.forEach(entry => {
+                const player = entry.player;
+                captainUsageCount.set(player, (captainUsageCount.get(player) || 0) + 1);
+            });
+
+            // Second pass: apply sanctions based on usage count
+            const seenCaptains = new Map(); // player -> times seen so far
+
+            history.forEach(entry => {
+                const player = entry.player;
+                const roundNum = parseFloat(entry.round);
+
+                const timesSeen = (seenCaptains.get(player) || 0) + 1;
+                seenCaptains.set(player, timesSeen);
+
+                // Apply sanction for 2nd+ usage
+                if (timesSeen >= 2) {
+                    const sanctionAmount = timesSeen - 1; // 2nd use = 1€, 3rd use = 2€, etc.
+                    result.sanctions.push({
+                        team: result.teamStats[teamId].name,
+                        amount: sanctionAmount,
+                        reason: `Capitán repetido (${player}) - Uso #${timesSeen}`,
+                        round: Math.floor(roundNum),
+                        leg: entry.round.toString().includes('.') ? (entry.round.toString().endsWith('.1') ? 1 : 2) : undefined
+                    });
+
+                    // Mark for UI
+                    if (timesSeen === 2) entry.warning = true;
+                    if (timesSeen >= 3) entry.alert = true;
+                }
+            });
+        });
+    },
+
+    _checkSameClubSanction(side, sanctions, round, leg = null) {
         if (!side.team || !side.lineup) return;
 
         // Group by club
@@ -605,7 +879,8 @@ export const CopaSanctionsService = {
                         team: side.team.name,
                         amount: 1,
                         reason: `2 jugadores mismo club y uno capitán (${players[0].club || 'mismo club'})`,
-                        round
+                        round,
+                        leg
                     });
                 }
             }

@@ -72,8 +72,10 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         };
     }, [allRounds, teamId, h2hStandings]);
 
-    const { stats, infractions, activeSanctions } = React.useMemo(() => {
+    const { stats, infractions, activeSanctions, totalCopaSanctions } = React.useMemo(() => {
         const rawStats = sanctionsData.teamStats || {};
+        const isCopa = championship?.type === 'copa';
+
         // 1. Try direct ID lookup
         let resolvedStats = rawStats[teamId];
         let resolvedId = teamId;
@@ -86,14 +88,20 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
             }
         }
 
+        // Aggregate Copa Sanctions if available
+        const teamCopaStats = (copaAnalysis?.teamStats?.[finalTeamId] ||
+            Object.values(copaAnalysis?.teamStats || {}).find(s => s.name === teamName));
+        const copaSanctionsValue = teamCopaStats?.total || 0;
+
         return {
             stats: resolvedStats || {},
             infractions: sanctionsData.infractions?.filter(inf => inf.teamId === resolvedId) || [],
             activeSanctions: sanctionsData.activeSanctions?.filter(s =>
                 s.teamId === resolvedId && s.outTeamUntil >= currentRoundNum
-            ) || []
+            ) || [],
+            totalCopaSanctions: copaSanctionsValue
         };
-    }, [sanctionsData, teamId, teamName, currentRoundNum]);
+    }, [sanctionsData, teamId, teamName, currentRoundNum, copaAnalysis, finalTeamId, championship?.type]);
 
     // Retrieve last match data directly from the enriched team object
     const { lastLineup, lastScore, lastRoundNum } = React.useMemo(() => {
@@ -117,71 +125,28 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         position: h2hStandings.findIndex(t => String(t.id) === String(teamId)) + 1
     }), [fullStats, h2hStandings, teamId]);
 
+    // Define teamCopaData early so it can be used by last5Matches and cupPath
+    const isCopa = championship?.type === 'copa';
+    const teamCopaStats = isCopa && (copaAnalysis?.teamStats?.[finalTeamId] ||
+        Object.values(copaAnalysis?.teamStats || {}).find(s => s.name === teamName));
+
+    const teamCopaData = React.useMemo(() => {
+        if (!isCopa || !copaAnalysis?.teamCopaStatus) return null;
+        return copaAnalysis.teamCopaStatus[finalTeamId] ||
+            Object.values(copaAnalysis.teamCopaStatus).find(s => s.name === teamName);
+    }, [isCopa, copaAnalysis, finalTeamId, teamName]);
+
     const last5Matches = React.useMemo(() => {
         if (championship?.type === 'copa') {
-            if (!cupData) return [];
-            const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
-            const history = [];
-
-            // Sort rounds by number ascending to process matches in order
-            const sortedRounds = [...rawRounds].sort((a, b) => a.number - b.number);
-
-            sortedRounds.forEach(r => {
-                const matches = r.matches || [];
-                matches.forEach(m => {
-                    const homeName = m.home?.team?.name;
-                    const awayName = m.away?.team?.name;
-                    const isHome = homeName === teamName;
-                    const isAway = awayName === teamName;
-
-                    if (isHome || isAway) {
-                        // Extract scores
-                        const getSideScore = (side) => {
-                            if (!side) return 0;
-                            if (Array.isArray(side.scores) && side.scores.length > 0) {
-                                return side.scores.reduce((a, b) => a + b, 0);
-                            }
-                            return side.score || 0;
-                        };
-
-                        const myScore = isHome ? getSideScore(m.home) : getSideScore(m.away);
-                        const oppScore = isHome ? getSideScore(m.away) : getSideScore(m.home);
-                        const oppName = isHome ? awayName : homeName;
-
-                        // Check for valid score data
-                        const homeHasScore = (m.home?.scores && m.home.scores.length > 0) || m.home?.score !== undefined;
-                        const awayHasScore = (m.away?.scores && m.away.scores.length > 0) || m.away?.score !== undefined;
-                        const hasMetrics = homeHasScore && awayHasScore;
-
-                        // Loose check for "finished": if it has scores and is not explicitly non-finished state
-                        // or if round is past.
-                        // IMPORTANT: For Copa, often 'status' is missing or ambiguous. Presence of scores usually means played.
-                        // We filter out only if it's explicitly 'scheduled' or 'live' with no scores.
-                        const isFinished =
-                            (m.status === 'finished') ||
-                            (r.status === 'past') ||
-                            (hasMetrics && m.status !== 'scheduled' && m.status !== 'live');
-
-                        if (isFinished && oppName && oppName !== 'TBD') {
-                            let result = 'E';
-                            if (myScore > oppScore) result = 'V';
-                            else if (myScore < oppScore) result = 'D';
-
-                            history.push({
-                                result,
-                                opponentName: oppName,
-                                round: r.number
-                            });
-                        }
-                    }
-                });
-            });
-
-            // Return last 5, reversed so most recent is first
-            return history.reverse().slice(0, 5);
+            if (teamCopaData && teamCopaData.matchHistory) {
+                // Use pre-calculated history from service which includes aggregated results
+                // Copy and reverse to show latest first
+                return [...teamCopaData.matchHistory].reverse().slice(0, 5);
+            }
+            return [];
         }
         return (fullStats.matchHistory || []).slice(0, 5);
-    }, [championship?.type, cupData, teamName, fullStats.matchHistory]);
+    }, [championship?.type, teamCopaData, fullStats.matchHistory]);
 
     const getRoundTitle = (num) => {
         switch (num) {
@@ -198,103 +163,133 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
     const cupPath = React.useMemo(() => {
         if (championship?.type !== 'copa' || !cupData) return null;
         const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
-        const activeRounds = [...rawRounds]
+
+        // 1. Group pairings for each round to handle multi-leg gracefully
+        const activeRounds = rawRounds
             .filter(r => r.matches && r.matches.length > 0)
-            .sort((a, b) => a.number - b.number);
+            .sort((a, b) => a.number - b.number)
+            .map(r => {
+                const pairings = [];
+                const seenPairs = new Set();
+
+                (r.matches || []).forEach(m => {
+                    const hName = m.home?.team?.name;
+                    const aName = m.away?.team?.name;
+                    const pairKey = [hName, aName].sort().join('|');
+
+                    if (seenPairs.has(pairKey)) return;
+                    seenPairs.add(pairKey);
+
+                    const legs = (r.matches || []).filter(lm => {
+                        const lh = lm.home?.team?.name;
+                        const la = lm.away?.team?.name;
+                        return [lh, la].sort().join('|') === pairKey;
+                    });
+
+                    pairings.push({
+                        ...m,
+                        legsCount: legs.length,
+                        isMyPairing: hName === teamName || aName === teamName
+                    });
+                });
+
+                return { ...r, pairings };
+            });
 
         if (activeRounds.length === 0) return null;
 
+        // 2. Find where the current team started
         let startRoundIdx = -1;
-        let startMatchIdx = -1;
+        let startPairIdx = -1;
         for (let i = 0; i < activeRounds.length; i++) {
-            const mIdx = activeRounds[i].matches.findIndex(m =>
-                m.home?.team?.name === teamName || m.away?.team?.name === teamName
-            );
-            if (mIdx !== -1) {
+            const pIdx = activeRounds[i].pairings.findIndex(p => p.isMyPairing);
+            if (pIdx !== -1) {
                 startRoundIdx = i;
-                startMatchIdx = mIdx;
+                startPairIdx = pIdx;
                 break;
             }
         }
-        if (startMatchIdx === -1) return null;
+
+        if (startPairIdx === -1) return null;
 
         const path = [];
         const numRounds = activeRounds.length;
+        const startRoundNum = activeRounds[startRoundIdx].number;
 
+        // If team didn't start in Round 1, add a note
+        if (startRoundNum > 1) {
+            path.push({
+                roundNum: 0, // Special marker for "didn't participate"
+                roundName: 'No participó en rondas anteriores',
+                didNotParticipate: true,
+                skippedRounds: Array.from({ length: startRoundNum - 1 }, (_, i) => i + 1)
+            });
+        }
+
+        // 3. Trace the path forward
+        let isEliminated = false;
         for (let k = 0; k < (numRounds - startRoundIdx); k++) {
             const roundIdx = startRoundIdx + k;
             const round = activeRounds[roundIdx];
-            const matchIdx = Math.floor(startMatchIdx / Math.pow(2, k));
-            const match = round.matches[matchIdx];
+            const pairIdx = Math.floor(startPairIdx / Math.pow(2, k));
+            const pairing = round.pairings[pairIdx];
 
-            if (!match) break;
+            if (!pairing) break;
 
-            const isHome = match.home?.team?.name === teamName;
-            const isAway = match.away?.team?.name === teamName;
+            const isHome = pairing.home?.team?.name === teamName;
+            const currentRivalName = isHome ? pairing.away?.team?.name : pairing.home?.team?.name;
 
-            const rivalMatchIdx = matchIdx ^ 1;
-            const possibleRivals = [];
-            const factor = Math.pow(2, k);
-            const startRange = rivalMatchIdx * factor;
-            const endRange = startRange + factor;
-
-            for (let j = startRange; j < endRange; j++) {
-                const baseMatch = activeRounds[startRoundIdx].matches[j];
-                if (baseMatch) {
-                    if (baseMatch.home?.team?.name) possibleRivals.push(baseMatch.home.team.name);
-                    if (baseMatch.away?.team?.name) possibleRivals.push(baseMatch.away.team.name);
+            const historyEntry = teamCopaData?.matchHistory?.find(h => h.round === round.number);
+            let resultStatus = 'neutral';
+            if (historyEntry) {
+                if (historyEntry.result === 'V') resultStatus = 'won';
+                else if (historyEntry.result === 'D') {
+                    resultStatus = 'lost';
+                    isEliminated = true; // Mark as eliminated after a loss
                 }
             }
 
+            // Only calculate possible rivals if team is still active
+            let possibleRivals = [];
+            if (!isEliminated && resultStatus !== 'lost') {
+                const rivalPairIdx = pairIdx ^ 1;
+                const factor = Math.pow(2, k);
+                const startRange = rivalPairIdx * factor;
+                const endRange = startRange + factor;
+
+                for (let j = startRange; j < endRange; j++) {
+                    const basePairing = activeRounds[startRoundIdx].pairings[j];
+                    if (basePairing) {
+                        if (basePairing.home?.team?.name) possibleRivals.push(basePairing.home.team.name);
+                        if (basePairing.away?.team?.name) possibleRivals.push(basePairing.away.team.name);
+                    }
+                }
+                possibleRivals = Array.from(new Set(possibleRivals)).filter(rn => rn !== teamName && rn !== 'TBD' && rn !== 'LIBRE');
+            }
+
             path.push({
-                roundNumber: round.number,
+                roundNum: round.number,
                 roundName: getRoundTitle(round.number),
-                currentRival: isHome ? (match.away?.team?.name || 'LIBRE') : (isAway ? (match.home?.team?.name || 'LIBRE') : null),
-                possibleRivals: Array.from(new Set(possibleRivals)).filter(r => r !== teamName),
-                isCurrent: (round.number === currentRoundNum),
-                isConfirmed: (isHome || isAway)
+                currentRival: (currentRivalName && currentRivalName !== 'TBD' && currentRivalName !== 'LIBRE') ? currentRivalName : null,
+                possibleRivals,
+                isCurrent: round.number === currentRoundNum,
+                resultStatus,
+                scoreAgg: historyEntry?.scoreAgg,
+                isEliminated: isEliminated && resultStatus === 'lost' // Mark this specific round as elimination round
             });
+
+            // Stop showing future rounds after elimination
+            if (isEliminated) break;
         }
         return path;
-    }, [championship?.type, cupData, teamName, currentRoundNum]);
-
-    const isCopa = championship?.type === 'copa';
-    const teamCopaStats = isCopa && (copaAnalysis?.teamStats?.[finalTeamId] ||
-        Object.values(copaAnalysis?.teamStats || {}).find(s => s.name === teamName));
+    }, [championship?.type, cupData, teamName, currentRoundNum, teamCopaData]);
 
     const teamStatus = React.useMemo(() => {
-        if (!isCopa || !cupData) return null;
-        const rawRounds = Array.isArray(cupData) ? cupData : (cupData?.rounds || []);
-
-        // Find all matches of this team
-        const allMyMatches = [];
-        rawRounds.forEach(r => {
-            const m = (r.matches || []).find(match => match.home?.team?.name === teamName || match.away?.team?.name === teamName);
-            if (m) allMyMatches.push({ roundNum: r.number, match: m });
-        });
-
-        if (allMyMatches.length === 0) return 'Desconocido';
-
-        // Sort by round number descending to get the latest match
-        allMyMatches.sort((a, b) => b.roundNum - a.roundNum);
-        const lastMatchInfo = allMyMatches[0];
-        const m = lastMatchInfo.match;
-        const isFinished = m.status === 'finished' || (m.homeScore !== undefined && m.awayScore !== undefined && m.status !== 'live');
-
-        if (!isFinished) return 'Sigue en juego';
-
-        // Check if won last match
-        const isHome = m.home?.team?.name === teamName;
-        const won = isHome ? (m.homeScore > m.awayScore) : (m.awayScore > m.homeScore);
-
-        if (won) {
-            // If it was the final, they are champion
-            if (lastMatchInfo.roundNum === 6) return 'Campeón';
-            return 'Sigue en juego';
-        } else {
-            return 'Eliminado';
-        }
-    }, [isCopa, cupData, teamName]);
+        if (!isCopa) return null;
+        if (!teamCopaData) return 'Calculando...';
+        if (teamCopaData.isEliminated) return teamCopaData.currentStage || 'Eliminado';
+        return 'EN JUEGO';
+    }, [isCopa, teamCopaData]);
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -351,7 +346,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                                 </div>
                                 <div className="stat-group">
                                     <span className="label">SANCIONES TOTALES</span>
-                                    <span className="value" style={{ color: '#ef4444' }}>{teamCopaStats?.total || 0}€</span>
+                                    <span className="value" style={{ color: '#ef4444' }}>{(stats?.total || 0) + totalCopaSanctions}€</span>
                                 </div>
                             </>
                         )}
@@ -502,36 +497,60 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                                 <div className="section-content-inner animate-slide-down">
                                     <div className="cup-path-timeline">
                                         {cupPath.map((r, i) => (
-                                            <div key={i} className={`cup-path-round ${r.isCurrent ? 'current' : ''}`}>
+                                            <div key={i} className={`cup-path-round ${r.didNotParticipate ? 'did-not-participate' : ''} ${r.isCurrent ? 'current' : ''} ${r.resultStatus ? 'status-' + r.resultStatus : ''}`}>
                                                 <div className="round-marker"></div>
                                                 <div className="round-details">
-                                                    <div className="round-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <span className="round-name">{r.roundName}</span>
-                                                        {r.isCurrent && <span className="current-badge">ACTUAL</span>}
-                                                    </div>
-                                                    <div className="rivals-container">
-                                                        {r.currentRival ? (
-                                                            <div className="confirmed-rival">
-                                                                <span className="rival-label">Rival:</span>
-                                                                <div className="rival-chip">
-                                                                    <img src={getTeamShield(r.currentRival)} alt="" className="micro-shield" />
-                                                                    <span>{r.currentRival}</span>
+                                                    {r.didNotParticipate ? (
+                                                        <div className="round-header" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <span className="round-name" style={{ fontStyle: 'italic', opacity: 0.7 }}>{r.roundName}</span>
+                                                            <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+                                                                (Exento de {r.skippedRounds?.map((rn, idx) => `Ronda ${rn}`).join(', ')})
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="round-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <span className="round-name">{r.roundName}</span>
+                                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                    {r.scoreAgg && (
+                                                                        <span className="score-badge" style={{
+                                                                            fontSize: '0.75rem',
+                                                                            fontWeight: 'bold',
+                                                                            background: 'rgba(255,255,255,0.1)',
+                                                                            padding: '2px 6px',
+                                                                            borderRadius: '4px'
+                                                                        }}>
+                                                                            {r.scoreAgg}
+                                                                        </span>
+                                                                    )}
+                                                                    {r.isCurrent && <span className="current-badge">ACTUAL</span>}
                                                                 </div>
                                                             </div>
-                                                        ) : (
-                                                            <div className="possible-rivals">
-                                                                <span className="rival-label">Posibles Rivales:</span>
-                                                                <div className="rival-grid-mini">
-                                                                    {r.possibleRivals.map((pr, idx) => (
-                                                                        <div key={idx} className="rival-chip mini" title={pr}>
-                                                                            <img src={getTeamShield(pr)} alt="" className="micro-shield" />
-                                                                            <span className="hide-mobile">{pr}</span>
+                                                            <div className="rivals-container">
+                                                                {r.currentRival ? (
+                                                                    <div className="confirmed-rival">
+                                                                        <span className="rival-label">Rival:</span>
+                                                                        <div className="rival-chip">
+                                                                            <img src={getTeamShield(r.currentRival)} alt="" className="micro-shield" />
+                                                                            <span>{r.currentRival}</span>
                                                                         </div>
-                                                                    ))}
-                                                                </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="possible-rivals">
+                                                                        <span className="rival-label">Posibles Rivales:</span>
+                                                                        <div className="rival-grid-mini">
+                                                                            {r.possibleRivals.map((pr, idx) => (
+                                                                                <div key={idx} className="rival-chip mini" title={pr}>
+                                                                                    <img src={getTeamShield(pr)} alt="" className="micro-shield" />
+                                                                                    <span className="hide-mobile">{pr}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
