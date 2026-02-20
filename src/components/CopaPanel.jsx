@@ -25,6 +25,28 @@ function CopaPanel({ cupData, loading, championship, onMatchClick }) {
         .filter(r => r.matches && r.matches.length > 0)
         .sort((a, b) => a.number - b.number);
 
+    // Group activeRounds by their base round number (e.g., 1.1 and 1.2 -> 1)
+    const groupedRounds = [];
+    const roundsByBase = {};
+
+    activeRounds.forEach(r => {
+        const baseNum = Math.floor(r.number || 0);
+        if (!roundsByBase[baseNum]) {
+            roundsByBase[baseNum] = {
+                ...r,
+                number: baseNum,
+                matches: [],
+                roundIds: [],
+                originalRounds: [] // Keep track of original round objects
+            };
+            groupedRounds.push(roundsByBase[baseNum]);
+        }
+        roundsByBase[baseNum].matches.push(...(r.matches || []));
+        roundsByBase[baseNum].originalRounds.push(r); // Store original round
+        const rId = r.roundId || r.id || r._id;
+        if (rId) roundsByBase[baseNum].roundIds.push(rId);
+    });
+
 
     const getRoundTitle = (num) => {
         switch (num) {
@@ -65,10 +87,16 @@ function CopaPanel({ cupData, loading, championship, onMatchClick }) {
             roundName: getRoundTitle(round.number)
         };
 
-        const effectiveId = round.id || round._id || round.roundId;
+        // Use legIds if available (from groupedMatches), otherwise fallback to round IDs
+        const roundIds = Array.isArray(match.legIds) ? match.legIds :
+            (Array.isArray(round.roundIds) ? round.roundIds :
+                (round.roundId ? [round.roundId] :
+                    (round.id ? [round.id] :
+                        (round._id ? [round._id] : []))));
+
         // Delegate to parent Dashboard
         if (onMatchClick) {
-            onMatchClick(normalizedMatch, effectiveId);
+            onMatchClick(normalizedMatch, roundIds);
         }
     };
 
@@ -237,7 +265,7 @@ function CopaPanel({ cupData, loading, championship, onMatchClick }) {
                     padding: '1rem',
                     justifyContent: 'center'
                 }}>
-                    {activeRounds.map((rnd, rIdx) => (
+                    {groupedRounds.map((rnd, rIdx) => (
                         <div key={rnd.number} className="bracket-column" style={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -247,12 +275,12 @@ function CopaPanel({ cupData, loading, championship, onMatchClick }) {
                             <div style={{
                                 textAlign: 'center',
                                 marginBottom: '1.5rem',
-                                color: isCopaPirana ? '#fbbf24' : '#fbbf24',
+                                color: '#fbbf24',
                                 fontWeight: 'bold',
                                 textTransform: 'uppercase',
-                                fontSize: isCopaPirana ? '1rem' : '0.8rem',
+                                fontSize: isCopaPirana ? '1.1rem' : '0.8rem',
                                 letterSpacing: '0.1em',
-                                textShadow: isCopaPirana ? '0 0 10px rgba(251, 191, 36, 0.3)' : 'none',
+                                textShadow: '0 0 10px rgba(251, 191, 36, 0.3)',
                                 padding: '0.5rem 1rem',
                                 background: isCopaPirana
                                     ? 'rgba(251, 191, 36, 0.1)'
@@ -270,215 +298,288 @@ function CopaPanel({ cupData, loading, championship, onMatchClick }) {
                                 flexDirection: 'column',
                                 justifyContent: 'space-around',
                                 flex: 1,
-                                gap: isCopaPirana ? '2rem' : '1rem'
+                                gap: isCopaPirana ? '2.5rem' : '1.5rem'
                             }}>
-                                {rnd.matches.map((m, mIdx) => {
-                                    const homeTeam = m.home?.team;
-                                    const awayTeam = m.away?.team;
-                                    const hScores = m.home?.scores || [];
-                                    const aScores = m.away?.scores || [];
+                                {(() => {
+                                    let finalMatches = [];
 
-                                    const hTotal = hScores.reduce((a, b) => a + b, 0);
-                                    const aTotal = aScores.reduce((a, b) => a + b, 0);
-                                    const finished = rnd.finished || (hScores.length >= 2 && aScores.length >= 2);
+                                    // Copa Piraña: Matches already contain both legs scores in arrays
+                                    if (isCopaPirana) {
+                                        finalMatches = (rnd.matches || []).map(m => {
+                                            if (!m.home?.team || !m.away?.team) return null;
 
-                                    const isHomeWinner = finished && hTotal > aTotal;
-                                    const isAwayWinner = finished && aTotal > hTotal;
+                                            const hScores = m.home.scores || [];
+                                            const aScores = m.away.scores || [];
 
-                                    return (
-                                        <div key={mIdx} className="bracket-matchup" style={{
-                                            width: isCopaPirana ? '260px' : '240px',
-                                            background: isCopaPirana
-                                                ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%)'
-                                                : 'rgba(30, 41, 59, 0.8)',
-                                            border: isCopaPirana
-                                                ? '1px solid rgba(251, 191, 36, 0.3)'
-                                                : '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: isCopaPirana ? '12px' : '8px',
-                                            padding: isCopaPirana ? '0.75rem' : '0.5rem',
-                                            fontSize: '0.85rem',
-                                            boxShadow: isCopaPirana
-                                                ? '0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(251, 191, 36, 0.1)'
-                                                : '0 4px 6px rgba(0,0,0,0.3)',
-                                            position: 'relative',
-                                            transition: 'all 0.3s ease',
-                                            overflow: 'hidden',
-                                            cursor: (m.home?.team && m.away?.team) ? 'pointer' : 'default',
-                                            opacity: (m.home?.team && m.away?.team) ? 1 : 0.6,
-                                            filter: (m.home?.team && m.away?.team) ? 'none' : 'grayscale(0.5)'
-                                        }}
-                                            onClick={() => handleMatchClick(m, rnd)}
-                                            onMouseEnter={(e) => {
-                                                if (isCopaPirana && m.home?.team && m.away?.team) {
-                                                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-                                                    e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.5), 0 0 30px rgba(251, 191, 36, 0.2)';
-                                                    e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.5)';
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (isCopaPirana && m.home?.team && m.away?.team) {
-                                                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(251, 191, 36, 0.1)';
-                                                    e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
-                                                }
-                                            }}
-                                        >
-                                            {/* Shimmer effect for Copa Piraña */}
-                                            {isCopaPirana && (
-                                                <div style={{
-                                                    position: 'absolute',
-                                                    top: 0,
-                                                    left: '-100%',
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    background: 'linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.1), transparent)',
-                                                    animation: 'shimmer 3s infinite',
-                                                    pointerEvents: 'none'
-                                                }}></div>
-                                            )}
+                                            // Ensure we have legIds from the round object
+                                            // The round object has a 'rounds' array with [idaId, vueltaId]
+                                            const legIds = rnd.rounds || [];
 
-                                            {/* Home Team */}
-                                            <div style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                padding: isCopaPirana ? '6px 0' : '4px 0',
-                                                opacity: (finished && aTotal > hTotal) ? 0.5 : 1,
-                                                background: isHomeWinner && isCopaPirana
-                                                    ? 'linear-gradient(90deg, rgba(74, 222, 128, 0.15), transparent)'
-                                                    : 'transparent',
-                                                borderRadius: '6px',
-                                                transition: 'all 0.3s ease'
-                                            }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, overflow: 'hidden' }}>
-                                                    <img
-                                                        src={getTeamShield(homeTeam?.name)}
-                                                        style={{
-                                                            width: isCopaPirana ? '24px' : '18px',
-                                                            height: isCopaPirana ? '24px' : '18px',
-                                                            objectFit: 'contain',
-                                                            filter: isHomeWinner ? 'drop-shadow(0 0 4px rgba(74, 222, 128, 0.5))' : 'none'
-                                                        }}
-                                                        onError={(e) => e.target.style.display = 'none'}
-                                                        alt=""
-                                                    />
-                                                    <span style={{
-                                                        fontWeight: (finished && hTotal > aTotal) ? 700 : 400,
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        fontSize: isCopaPirana ? '0.9rem' : '0.85rem',
-                                                        color: isHomeWinner ? '#4ade80' : '#e2e8f0'
-                                                    }}>
-                                                        {homeTeam?.name || (awayTeam ? 'LIBRE' : 'TBD')}
-                                                    </span>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '8px', marginLeft: '4px', alignItems: 'center' }}>
-                                                    {hScores.map((s, idx) => (
-                                                        <div key={idx} style={{
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            alignItems: 'center',
-                                                            minWidth: '20px'
-                                                        }}>
-                                                            <span style={{ fontSize: '0.6rem', opacity: 0.4, textTransform: 'uppercase' }}>{idx === 0 ? 'I' : 'V'}</span>
-                                                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{s}</span>
-                                                        </div>
-                                                    ))}
-                                                    <div style={{
-                                                        marginLeft: '4px',
-                                                        padding: '2px 6px',
-                                                        background: isHomeWinner ? 'rgba(74, 222, 128, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                        borderRadius: '4px',
-                                                        border: isHomeWinner ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid transparent'
-                                                    }}>
-                                                        <span style={{
-                                                            fontWeight: '900',
-                                                            color: isHomeWinner ? '#4ade80' : 'white',
-                                                            fontSize: isCopaPirana ? '1.1rem' : '0.9rem'
-                                                        }}>
-                                                            {hTotal}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            return {
+                                                ...m,
+                                                legIds, // Pass the roundIds for both legs
+                                                home: { ...m.home, scores: hScores },
+                                                away: { ...m.away, scores: aScores }
+                                            };
+                                        }).filter(Boolean);
+                                    } else {
+                                        // League Logic (grouping by pairing)
+                                        const groupedMatches = [];
+                                        const seenPairs = new Set();
 
-                                            <div style={{
-                                                height: '1px',
+                                        (rnd.matches || []).forEach(m => {
+                                            const hName = m.home?.team?.name;
+                                            const aName = m.away?.team?.name;
+                                            if (!hName || !aName) {
+                                                groupedMatches.push(m);
+                                                return;
+                                            }
+
+                                            const pairKey = [hName, aName].sort().join('|');
+                                            if (seenPairs.has(pairKey)) return;
+                                            seenPairs.add(pairKey);
+
+                                            // Find other matches in this group that match this pairing
+                                            const legs = (rnd.matches || []).filter(lm => {
+                                                const lh = lm.home?.team?.name;
+                                                const la = lm.away?.team?.name;
+                                                return lh && la && [lh, la].sort().join('|') === pairKey;
+                                            });
+
+                                            const hScores = [];
+                                            const aScores = [];
+                                            const legIds = [];
+
+                                            legs.forEach(leg => {
+                                                // Logic for League/other tournaments...
+                                                const lHScore = (leg.home?.scores?.[0] !== undefined) ? leg.home.scores[0] : (leg.homeScore || 0);
+                                                const lAScore = (leg.away?.scores?.[0] !== undefined) ? leg.away.scores[0] : (leg.awayScore || 0);
+                                                hScores.push(lHScore);
+                                                aScores.push(lAScore);
+
+                                                if (leg.roundId) legIds.push(leg.roundId);
+                                                else if (leg._id) legIds.push(leg._id);
+                                            });
+
+                                            groupedMatches.push({
+                                                ...m,
+                                                legIds: legIds.length > 0 ? legIds : rnd.roundIds,
+                                                home: { ...m.home, scores: hScores },
+                                                away: { ...m.away, scores: aScores }
+                                            });
+                                        });
+
+                                        finalMatches = groupedMatches;
+                                    }
+
+                                    return finalMatches.map((m, mIdx) => {
+                                        const homeTeam = m.home?.team;
+                                        const awayTeam = m.away?.team;
+                                        const hScores = m.home?.scores || [];
+                                        const aScores = m.away?.scores || [];
+
+                                        const hTotal = hScores.reduce((a, b) => a + b, 0);
+                                        const aTotal = aScores.reduce((a, b) => a + b, 0);
+                                        const finished = rnd.finished || (hScores.length >= 2 && aScores.length >= 2);
+
+                                        const isHomeWinner = finished && hTotal > aTotal;
+                                        const isAwayWinner = finished && aTotal > hTotal;
+
+                                        return (
+                                            <div key={mIdx} className="bracket-matchup" style={{
+                                                width: isCopaPirana ? '280px' : '240px',
                                                 background: isCopaPirana
-                                                    ? 'linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), transparent)'
-                                                    : 'rgba(255,255,255,0.05)',
-                                                margin: '4px 0'
-                                            }}></div>
-
-                                            {/* Away Team */}
-                                            <div style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                padding: isCopaPirana ? '6px 0' : '4px 0',
-                                                opacity: (finished && hTotal > aTotal) ? 0.5 : 1,
-                                                background: isAwayWinner && isCopaPirana
-                                                    ? 'linear-gradient(90deg, rgba(74, 222, 128, 0.15), transparent)'
-                                                    : 'transparent',
-                                                borderRadius: '6px',
-                                                transition: 'all 0.3s ease'
-                                            }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, overflow: 'hidden' }}>
-                                                    <img
-                                                        src={getTeamShield(awayTeam?.name)}
-                                                        style={{
-                                                            width: isCopaPirana ? '24px' : '18px',
-                                                            height: isCopaPirana ? '24px' : '18px',
-                                                            objectFit: 'contain',
-                                                            filter: isAwayWinner ? 'drop-shadow(0 0 4px rgba(74, 222, 128, 0.5))' : 'none'
-                                                        }}
-                                                        onError={(e) => e.target.style.display = 'none'}
-                                                        alt=""
-                                                    />
-                                                    <span style={{
-                                                        fontWeight: (finished && aTotal > hTotal) ? 700 : 400,
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        fontSize: isCopaPirana ? '0.9rem' : '0.85rem',
-                                                        color: isAwayWinner ? '#4ade80' : '#e2e8f0'
-                                                    }}>
-                                                        {awayTeam?.name || (homeTeam ? 'LIBRE' : 'TBD')}
-                                                    </span>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '8px', marginLeft: '4px', alignItems: 'center' }}>
-                                                    {aScores.map((s, idx) => (
-                                                        <div key={idx} style={{
-                                                            display: 'flex',
-                                                            flexDirection: 'column',
-                                                            alignItems: 'center',
-                                                            minWidth: '20px'
-                                                        }}>
-                                                            <span style={{ fontSize: '0.6rem', opacity: 0.4, textTransform: 'uppercase' }}>{idx === 0 ? 'I' : 'V'}</span>
-                                                            <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>{s}</span>
-                                                        </div>
-                                                    ))}
+                                                    ? 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%)'
+                                                    : 'rgba(30, 41, 59, 0.8)',
+                                                border: isCopaPirana
+                                                    ? '1px solid rgba(251, 191, 36, 0.3)'
+                                                    : '1px solid rgba(255,255,255,0.1)',
+                                                borderRadius: isCopaPirana ? '12px' : '8px',
+                                                padding: isCopaPirana ? '1rem' : '0.5rem',
+                                                fontSize: '0.85rem',
+                                                boxShadow: isCopaPirana
+                                                    ? '0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(251, 191, 36, 0.1)'
+                                                    : '0 4px 6px rgba(0,0,0,0.3)',
+                                                position: 'relative',
+                                                transition: 'all 0.3s ease',
+                                                overflow: 'hidden',
+                                                cursor: (m.home?.team && m.away?.team) ? 'pointer' : 'default',
+                                                opacity: (m.home?.team && m.away?.team) ? 1 : 0.6,
+                                                filter: (m.home?.team && m.away?.team) ? 'none' : 'grayscale(0.5)'
+                                            }}
+                                                onClick={() => handleMatchClick(m, rnd)}
+                                                onMouseEnter={(e) => {
+                                                    if (isCopaPirana && m.home?.team && m.away?.team) {
+                                                        e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                                                        e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.5), 0 0 30px rgba(251, 191, 36, 0.2)';
+                                                        e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.5)';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    if (isCopaPirana && m.home?.team && m.away?.team) {
+                                                        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                        e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(251, 191, 36, 0.1)';
+                                                        e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+                                                    }
+                                                }}
+                                            >
+                                                {/* Shimmer effect for Copa Piraña */}
+                                                {isCopaPirana && (
                                                     <div style={{
-                                                        marginLeft: '4px',
-                                                        padding: '2px 6px',
-                                                        background: isAwayWinner ? 'rgba(74, 222, 128, 0.1)' : 'rgba(255,255,255,0.05)',
-                                                        borderRadius: '4px',
-                                                        border: isAwayWinner ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid transparent'
-                                                    }}>
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        left: '-100%',
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        background: 'linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.1), transparent)',
+                                                        animation: 'shimmer 3s infinite',
+                                                        pointerEvents: 'none'
+                                                    }}></div>
+                                                )}
+
+                                                {/* Home Team */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: isCopaPirana ? '8px 0' : '4px 0',
+                                                    opacity: (finished && aTotal > hTotal) ? 0.5 : 1,
+                                                    background: isHomeWinner && isCopaPirana
+                                                        ? 'linear-gradient(90deg, rgba(74, 222, 128, 0.15), transparent)'
+                                                        : 'transparent',
+                                                    borderRadius: '6px',
+                                                    transition: 'all 0.3s ease'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, overflow: 'hidden' }}>
+                                                        <img
+                                                            src={getTeamShield(homeTeam?.name)}
+                                                            style={{
+                                                                width: isCopaPirana ? '24px' : '18px',
+                                                                height: isCopaPirana ? '24px' : '18px',
+                                                                objectFit: 'contain',
+                                                                filter: isHomeWinner ? 'drop-shadow(0 0 4px rgba(74, 222, 128, 0.5))' : 'none'
+                                                            }}
+                                                            onError={(e) => e.target.style.display = 'none'}
+                                                            alt=""
+                                                        />
                                                         <span style={{
-                                                            fontWeight: '900',
-                                                            color: isAwayWinner ? '#4ade80' : 'white',
-                                                            fontSize: isCopaPirana ? '1.1rem' : '0.9rem'
+                                                            fontWeight: (finished && hTotal > aTotal) ? 700 : 400,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            fontSize: isCopaPirana ? '0.95rem' : '0.85rem',
+                                                            color: isHomeWinner ? '#4ade80' : '#e2e8f0'
                                                         }}>
-                                                            {aTotal}
+                                                            {homeTeam?.name || (awayTeam ? 'LIBRE' : 'TBD')}
                                                         </span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '8px', marginLeft: '4px', alignItems: 'center' }}>
+                                                        {hScores.map((s, idx) => (
+                                                            <div key={idx} style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center',
+                                                                minWidth: '20px'
+                                                            }}>
+                                                                <span style={{ fontSize: '0.65rem', opacity: 0.5, fontWeight: 'bold' }}>{idx === 0 ? 'I' : 'V'}</span>
+                                                                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{s}</span>
+                                                            </div>
+                                                        ))}
+                                                        <div style={{
+                                                            marginLeft: '4px',
+                                                            padding: '2px 8px',
+                                                            background: isHomeWinner ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                            borderRadius: '4px',
+                                                            border: isHomeWinner ? '1px solid #4ade80' : '1px solid transparent'
+                                                        }}>
+                                                            <span style={{
+                                                                fontWeight: '900',
+                                                                color: isHomeWinner ? '#4ade80' : 'white',
+                                                                fontSize: isCopaPirana ? '1.2rem' : '1rem'
+                                                            }}>
+                                                                {hTotal}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{
+                                                    height: '1px',
+                                                    background: isCopaPirana
+                                                        ? 'linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), transparent)'
+                                                        : 'rgba(255,255,255,0.05)',
+                                                    margin: '6px 0'
+                                                }}></div>
+
+                                                {/* Away Team */}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: isCopaPirana ? '8px 0' : '4px 0',
+                                                    opacity: (finished && hTotal > aTotal) ? 0.5 : 1,
+                                                    background: isAwayWinner && isCopaPirana
+                                                        ? 'linear-gradient(90deg, rgba(74, 222, 128, 0.15), transparent)'
+                                                        : 'transparent',
+                                                    borderRadius: '6px',
+                                                    transition: 'all 0.3s ease'
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, overflow: 'hidden' }}>
+                                                        <img
+                                                            src={getTeamShield(awayTeam?.name)}
+                                                            style={{
+                                                                width: isCopaPirana ? '24px' : '18px',
+                                                                height: isCopaPirana ? '24px' : '18px',
+                                                                objectFit: 'contain',
+                                                                filter: isAwayWinner ? 'drop-shadow(0 0 4px rgba(74, 222, 128, 0.5))' : 'none'
+                                                            }}
+                                                            onError={(e) => e.target.style.display = 'none'}
+                                                            alt=""
+                                                        />
+                                                        <span style={{
+                                                            fontWeight: (finished && aTotal > hTotal) ? 700 : 400,
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            fontSize: isCopaPirana ? '0.95rem' : '0.85rem',
+                                                            color: isAwayWinner ? '#4ade80' : '#e2e8f0'
+                                                        }}>
+                                                            {awayTeam?.name || (homeTeam ? 'LIBRE' : 'TBD')}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '8px', marginLeft: '4px', alignItems: 'center' }}>
+                                                        {aScores.map((s, idx) => (
+                                                            <div key={idx} style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center',
+                                                                minWidth: '20px'
+                                                            }}>
+                                                                <span style={{ fontSize: '0.65rem', opacity: 0.5, fontWeight: 'bold' }}>{idx === 0 ? 'I' : 'V'}</span>
+                                                                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{s}</span>
+                                                            </div>
+                                                        ))}
+                                                        <div style={{
+                                                            marginLeft: '4px',
+                                                            padding: '2px 8px',
+                                                            background: isAwayWinner ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.05)',
+                                                            borderRadius: '4px',
+                                                            border: isAwayWinner ? '1px solid #4ade80' : '1px solid transparent'
+                                                        }}>
+                                                            <span style={{
+                                                                fontWeight: '900',
+                                                                color: isAwayWinner ? '#4ade80' : 'white',
+                                                                fontSize: isCopaPirana ? '1.2rem' : '1rem'
+                                                            }}>
+                                                                {aTotal}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    });
+                                })()}
                             </div>
                         </div>
                     ))}
@@ -499,20 +600,6 @@ function CopaPanel({ cupData, loading, championship, onMatchClick }) {
                 }
                 .copa-bracket-container::-webkit-scrollbar-thumb:hover {
                     background: linear-gradient(90deg, rgba(251, 191, 36, 0.7), rgba(245, 158, 11, 0.9));
-                }
-                .bracket-column:not(:last-child) .bracket-matchup::after {
-                    content: "";
-                    position: absolute;
-                    top: 50%;
-                    right: ${isCopaPirana ? '-4rem' : '-3rem'};
-                    width: ${isCopaPirana ? '4rem' : '3rem'};
-                    height: 2px;
-                    background: ${isCopaPirana
-                        ? 'linear-gradient(90deg, rgba(251, 191, 36, 0.4), rgba(251, 191, 36, 0.1))'
-                        : 'rgba(255,255,255,0.2)'
-                    };
-                    z-index: -1;
-                    box-shadow: ${isCopaPirana ? '0 0 8px rgba(251, 191, 36, 0.2)' : 'none'};
                 }
                 
                 @keyframes pulse-glow {

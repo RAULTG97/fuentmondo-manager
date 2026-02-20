@@ -252,3 +252,131 @@
         min-width: 100%;
     }
 }
+
+/* Leg Selector & Total Scores */
+.leg-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.leg-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.leg-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.leg-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+}
+
+.score-total-badge {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-weight: 600;
+    margin-top: 0.25rem;
+    opacity: 0.8;
+}
+
+.score-winner .score-total-badge {
+    color: #4ade80;
+    opacity: 0.6;
+}
+
+/* ==========================================
+   Lineup Incompleteness Penalty Styles
+   ========================================== */
+
+/* Penalty detail below scoreboard score */
+.lineup-penalty-detail {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
+    background: rgba(251, 191, 36, 0.1);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    color: #fbbf24;
+    font-weight: 600;
+    animation: fadeSlideIn 0.3s ease-out;
+}
+
+.lineup-penalty-detail .penalty-icon {
+    font-size: 0.8rem;
+}
+
+.lineup-penalty-detail .penalty-pts {
+    font-weight: 800;
+    margin-left: 0.2rem;
+}
+
+/* Warning banner below the scoreboard */
+.lineup-penalty-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(239, 68, 68, 0.05));
+    border-top: 1px solid rgba(251, 191, 36, 0.2);
+    border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+    flex-shrink: 0;
+}
+
+.penalty-banner-icon {
+    font-size: 1.25rem;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+
+.penalty-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+.penalty-banner-text strong {
+    color: #fbbf24;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+
+.penalty-banner-text span {
+    color: var(--text-muted);
+}
+
+.penalty-banner-text span strong {
+    color: #ef4444;
+    font-size: 0.78rem;
+}
+
+@keyframes fadeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

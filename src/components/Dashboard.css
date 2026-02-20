@@ -1208,3 +1208,52 @@
         font-size: 1.5rem;
     }
 }
+
+/* ==========================================
+   Lineup Penalty Badge — MatchupsList Cards
+   ========================================== */
+
+/* Column wrapper to stack score + penalty badge */
+.score-team-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+/* Small warning badge under the score number */
+.lineup-penalty-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
+    font-size: 0.62rem;
+    font-weight: 800;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-full);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    animation: pulse-penalty 2s infinite;
+}
+
+@keyframes pulse-penalty {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.65;
+    }
+}
+
+/* Spacer so scores stay vertically centered when no penalty badge on one side */
+.lineup-penalty-spacer {
+    display: block;
+    height: 16px;
+    /* Same approximate height as .lineup-penalty-badge */
+    pointer-events: none;
+}

@@ -125,7 +125,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                 />
                                 <MatchupsList
                                     matches={currentRound.matches}
-                                    onMatchClick={setSelectedMatch}
+                                    onMatchClick={handleMatchClick}
                                     isLiveRound={currentRound.status === 'current'}
                                     roundStatus={currentRound.status}
                                 />
@@ -135,7 +135,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 }
                 // Fallback to old behavior for Copa or when allRounds not ready
                 const roundStatus = isHistoricalRound ? 'historical' : 'current';
-                return <MatchupsList matches={matches} onMatchClick={setSelectedMatch} isLiveRound={selectedRoundId === activeRoundNum} roundStatus={roundStatus} />;
+                return <MatchupsList matches={matches} onMatchClick={handleMatchClick} isLiveRound={selectedRoundId === activeRoundNum} roundStatus={roundStatus} />;
             case 'standings':
                 if (loadingStandings) return <TableSkeleton rows={10} columns={12} />;
                 return (

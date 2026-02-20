@@ -244,3 +244,57 @@
         max-width: 60px;
     }
 }
+
+/* ==========================================
+   LEY ENIGMA — Missing Player Tokens
+   ========================================== */
+
+/* Enigma row sits below all real players */
+.enigma-row {
+    border-top: 1px dashed rgba(251, 191, 36, 0.25);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    gap: 1.5rem;
+}
+
+.compact .enigma-row {
+    gap: 1rem;
+}
+
+/* Enigma avatar: dark + golden glow to feel mysterious */
+.enigma-avatar {
+    background: linear-gradient(135deg, #1a0a2e 0%, #2d1a4a 100%) !important;
+    border: 2px solid rgba(251, 191, 36, 0.5) !important;
+    box-shadow:
+        0 0 15px rgba(251, 191, 36, 0.3),
+        0 8px 16px rgba(0, 0, 0, 0.6) !important;
+    animation: enigma-pulse 3s ease-in-out infinite;
+    overflow: hidden;
+}
+
+@keyframes enigma-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 10px rgba(251, 191, 36, 0.2), 0 8px 16px rgba(0, 0, 0, 0.6);
+    }
+
+    50% {
+        box-shadow: 0 0 25px rgba(251, 191, 36, 0.6), 0 8px 16px rgba(0, 0, 0, 0.6);
+    }
+}
+
+/* -5 pts badge with red colour */
+.enigma-pts-badge {
+    background-color: var(--error) !important;
+    color: white;
+}
+
+/* Enigma name label: golden italic */
+.enigma-name-label {
+    color: #fbbf24 !important;
+    font-style: italic;
+    letter-spacing: 0.05em;
+    border-color: rgba(251, 191, 36, 0.3) !important;
+    background: rgba(251, 191, 36, 0.08) !important;
+}

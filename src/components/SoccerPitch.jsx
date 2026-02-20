@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Crown, User } from 'lucide-react';
 import './SoccerPitch.css';
 
+const MAX_PLAYERS = 11;
+
 const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -24,6 +26,16 @@ const playerVariants = {
     }
 };
 
+const enigmaVariants = {
+    hidden: { opacity: 0, scale: 0.3, rotate: -10 },
+    visible: {
+        opacity: 1,
+        scale: 1,
+        rotate: 0,
+        transition: { type: 'spring', damping: 12, stiffness: 150 }
+    }
+};
+
 function SoccerPitch({ players, compact = false }) {
     // Group by role. Roles from API are: portero, defensa, centrocampista, delantero
     const groups = {
@@ -38,6 +50,10 @@ function SoccerPitch({ players, compact = false }) {
             p.role !== 'delantero'
         )
     };
+
+    // LEY ENIGMA: missing players appear as enigma tokens
+    const missingCount = Math.max(0, MAX_PLAYERS - players.length);
+    const enigmas = Array.from({ length: missingCount }, (_, i) => i);
 
     return (
         <div className={`soccer-pitch ${compact ? 'compact' : 'large'}`}>
@@ -87,6 +103,13 @@ function SoccerPitch({ players, compact = false }) {
                             {groups.others.map((p, i) => <PlayerToken key={`other-${i}`} player={p} compact={compact} />)}
                         </div>
                     )}
+
+                    {/* LEY ENIGMA: missing players */}
+                    {enigmas.length > 0 && (
+                        <div className="pitch-row enigma-row">
+                            {enigmas.map((_, i) => <EnigmaToken key={`enigma-${i}`} compact={compact} />)}
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </div>
@@ -117,6 +140,39 @@ function PlayerToken({ player, compact }) {
 
             <div className="player-name-label">
                 {player.name}
+            </div>
+        </motion.div>
+    );
+}
+
+/**
+ * EnigmaToken — represents a missing player (Ley Enigma).
+ * Shows the enigma.jpeg image with a -5 pts badge.
+ */
+function EnigmaToken({ compact }) {
+    return (
+        <motion.div className="player-token enigma-token" variants={enigmaVariants} whileHover={{ y: -5, rotate: 2 }}>
+            <div className="player-avatar-container enigma-avatar">
+                <img
+                    src="/fuentmondo-manager/escudos/enigma.jpeg"
+                    alt="Enigma"
+                    className={`enigma-img ${compact ? 'compact' : 'large'}`}
+                    style={{
+                        width: compact ? '34px' : '48px',
+                        height: compact ? '34px' : '48px',
+                        objectFit: 'cover',
+                        borderRadius: '50%',
+                        opacity: 0.85
+                    }}
+                />
+                {/* -5 pts badge */}
+                <div className="player-pts-badge enigma-pts-badge">
+                    -5
+                </div>
+            </div>
+
+            <div className="player-name-label enigma-name-label">
+                Enigma
             </div>
         </motion.div>
     );

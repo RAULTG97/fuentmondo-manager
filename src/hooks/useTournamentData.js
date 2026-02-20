@@ -4,6 +4,7 @@ import { getInternalRankingRound, getInternalLineup, getInternalCup, getLeagueMa
 import { calculateH2HStandings } from '../utils/StandingsCalculator';
 import { CopaSanctionsService } from '../services/copaSanctionsService';
 import { sendWhatsAppReport } from '../utils/notifications';
+import { calcLineupPenalty } from '../utils/LineupPenaltyCalculator';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -305,11 +306,26 @@ export const useTournamentData = (activeTab) => {
                     ]);
                     const sH = extractPts(resH);
                     const sA = extractPts(resA);
+                    const lineupA = resH.players?.initial || resH.players || [];
+                    const lineupB = resA.players?.initial || resA.players || [];
+
+                    // Lineup incompleteness penalty: -5 pts per missing player
+                    const { penaltyPoints: penH, missingPlayers: missH } = calcLineupPenalty(lineupA);
+                    const { penaltyPoints: penA, missingPlayers: missA } = calcLineupPenalty(lineupB);
+                    const finalH = sH + penH;
+                    const finalA = sA + penA;
+
                     currentMatches[gIdx] = {
                         ...currentMatches[gIdx],
-                        homeScore: sH, awayScore: sA, m: [sH, sA],
-                        lineupA: resH.players?.initial || resH.players || [],
-                        lineupB: resA.players?.initial || resA.players || [],
+                        homeScore: finalH,
+                        awayScore: finalA,
+                        m: [finalH, finalA],
+                        homePenalty: penH,
+                        awayPenalty: penA,
+                        homeMissing: missH,
+                        awayMissing: missA,
+                        lineupA,
+                        lineupB,
                         enriched: true
                     };
                 } catch (e) {
@@ -623,6 +639,14 @@ export const useTournamentData = (activeTab) => {
                                 ]);
                                 m.lineupA = resH.players?.initial || resH.players || [];
                                 m.lineupB = resA.players?.initial || resA.players || [];
+
+                                // Lineup incompleteness penalty: -5 pts per missing player
+                                const { penaltyPoints: penH, missingPlayers: missH } = calcLineupPenalty(m.lineupA);
+                                const { penaltyPoints: penA, missingPlayers: missA } = calcLineupPenalty(m.lineupB);
+                                if (penH < 0) { m.homeScore = (m.homeScore || 0) + penH; m.homePenalty = penH; m.homeMissing = missH; }
+                                if (penA < 0) { m.awayScore = (m.awayScore || 0) + penA; m.awayPenalty = penA; m.awayMissing = missA; }
+                                // Sync m[] array so StandingsCalculator reads penalised scores
+                                m.m = [m.homeScore || 0, m.awayScore || 0];
                                 m.enriched = true;
                             } catch (e) { /* silent catch */ }
                         }));

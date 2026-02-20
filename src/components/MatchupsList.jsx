@@ -80,6 +80,10 @@ function MatchupsList({ matches, onMatchClick, isLiveRound, roundStatus }) {
                     awayScore = m.awayScore !== undefined ? m.awayScore : '-';
                 }
 
+                // Lineup penalties
+                const homeMissing = m.homeMissing || 0;
+                const awayMissing = m.awayMissing || 0;
+
                 // Determine winner for highlighting (only for past/current with scores)
                 const homeWon = (roundStatus === 'past' || (roundStatus === 'current' && isEnriched)) &&
                     m.homeScore > m.awayScore;
@@ -132,13 +136,29 @@ function MatchupsList({ matches, onMatchClick, isLiveRound, roundStatus }) {
                             {/* Score / VS */}
                             <div className="score-block">
                                 <div className={`score-display ${showLiveBadge ? 'score-live' : ''}`}>
-                                    <span className={homeWon ? 'winner-glow' : ''}>
-                                        {homeScore}
-                                    </span>
+                                    <div className="score-team-col">
+                                        {homeMissing > 0 && (
+                                            <span className="lineup-penalty-badge" title={`LEY ENIGMA: ${homeMissing} enigma(s)`}>
+                                                ⚠️ -{homeMissing * 5}
+                                            </span>
+                                        )}
+                                        {!homeMissing && <span className="lineup-penalty-spacer" />}
+                                        <span className={homeWon ? 'winner-glow' : ''}>
+                                            {homeScore}
+                                        </span>
+                                    </div>
                                     <span className="score-divider">:</span>
-                                    <span className={awayWon ? 'winner-glow' : ''}>
-                                        {awayScore}
-                                    </span>
+                                    <div className="score-team-col">
+                                        {awayMissing > 0 && (
+                                            <span className="lineup-penalty-badge" title={`LEY ENIGMA: ${awayMissing} enigma(s)`}>
+                                                ⚠️ -{awayMissing * 5}
+                                            </span>
+                                        )}
+                                        {!awayMissing && <span className="lineup-penalty-spacer" />}
+                                        <span className={awayWon ? 'winner-glow' : ''}>
+                                            {awayScore}
+                                        </span>
+                                    </div>
                                 </div>
                                 <div className="match-status">
                                     {matchStatus}

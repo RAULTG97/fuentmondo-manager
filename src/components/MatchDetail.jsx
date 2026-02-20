@@ -5,6 +5,7 @@ import SoccerPitch from './SoccerPitch';
 import MatchShareCard from './MatchShareCard';
 import { getTeamShield } from '../utils/assets';
 import Confetti from './Confetti';
+import { calcLineupPenalty } from '../utils/LineupPenaltyCalculator';
 import './MatchDetail.css';
 
 function MatchDetail({ match, championshipId, roundId, onClose }) {
@@ -13,6 +14,11 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [showShare, setShowShare] = useState(false);
+
+    // Support for multiple legs
+    const roundIds = Array.isArray(roundId) ? roundId : [roundId];
+    const [activeLegIdx, setActiveLegIdx] = useState(0);
+    const activeRoundId = roundIds[activeLegIdx];
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -48,7 +54,7 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
 
     useEffect(() => {
 
-        if (!match || !championshipId || !roundId) {
+        if (!match || !championshipId || !activeRoundId) {
             setLoading(false); // vital to stop "Cargando..."
             return;
         }
@@ -72,8 +78,8 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
         setLoading(true);
 
         Promise.all([
-            getInternalLineup(championshipId, idA, roundId),
-            getInternalLineup(championshipId, idB, roundId)
+            getInternalLineup(championshipId, idA, activeRoundId),
+            getInternalLineup(championshipId, idB, activeRoundId)
         ]).then(([resHome, resAway]) => {
             setLineupHome(extractPlayers(resHome));
             setLineupAway(extractPlayers(resAway));
@@ -83,18 +89,26 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
             setLoading(false);
         });
 
-    }, [match, championshipId, roundId]);
+    }, [match, championshipId, activeRoundId]);
 
-    // Calculated Scores (Live)
-    const homePoints = lineupHome ? lineupHome.reduce((acc, p) => acc + (p.points || 0), 0) : (match.homeScore || 0);
-    const awayPoints = lineupAway ? lineupAway.reduce((acc, p) => acc + (p.points || 0), 0) : (match.awayScore || 0);
+    // Calculated Scores (Leg specific — raw points from lineup)
+    const homeRaw = lineupHome ? lineupHome.reduce((acc, p) => acc + (p.points || 0), 0) : (match.home?.scores?.[activeLegIdx] || 0);
+    const awayRaw = lineupAway ? lineupAway.reduce((acc, p) => acc + (p.points || 0), 0) : (match.away?.scores?.[activeLegIdx] || 0);
 
-    // Determined leg: if roundId is an array, we might need a way to switch.
-    // However, for now let's assume if it is an array [ida, vuelta], we show aggregate if both complete?
-    // Actually, usually Futmondo API returns legs as separate round IDs.
-    // BUT the cup matching logic in handleMatchClick (CopaPanel) only passes ONE effectiveId.
-    // If it's two legs, which roundId should we fetch?
-    // Usually the active one.
+    // Lineup incompleteness penalty (only when we have the actual lineup)
+    const { penaltyPoints: homePen, missingPlayers: homeMissing } = lineupHome
+        ? calcLineupPenalty(lineupHome)
+        : { penaltyPoints: 0, missingPlayers: 0 };
+    const { penaltyPoints: awayPen, missingPlayers: awayMissing } = lineupAway
+        ? calcLineupPenalty(lineupAway)
+        : { penaltyPoints: 0, missingPlayers: 0 };
+
+    const homePoints = homeRaw + homePen;
+    const awayPoints = awayRaw + awayPen;
+
+    // Aggregated Score
+    const homeTotal = match.home?.scores?.reduce((a, b) => a + b, 0) || (match.homeScore || 0);
+    const awayTotal = match.away?.scores?.reduce((a, b) => a + b, 0) || (match.awayScore || 0);
 
     // Determine winner for confetti
     const hasWinner = homePoints !== awayPoints;
@@ -109,8 +123,23 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
             <div className="match-detail-card modal-content-animate" onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="match-detail-header">
-                    <h3>Detalle del Enfrentamiento</h3>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <h3>Detalle del Enfrentamiento</h3>
+                        {roundIds.length > 1 && (
+                            <div className="leg-selector">
+                                {roundIds.map((_, idx) => (
+                                    <button
+                                        key={idx}
+                                        className={`leg-btn ${activeLegIdx === idx ? 'active' : ''}`}
+                                        onClick={() => setActiveLegIdx(idx)}
+                                    >
+                                        Partido {idx + 1}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
                         <button onClick={() => setShowShare(true)} className="share-btn-action-meme" title="Generar Crónica">
                             <span className="meme-btn-text">Crónica</span>
                             <span className="meme-btn-emoji">📰</span>
@@ -135,8 +164,16 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
                         </div>
                         <div className={`score-display ${homePoints > awayPoints ? 'score-winner' : ''}`}>
                             {homePoints}
+                            {roundIds.length > 1 && <span className="score-total-badge">Total: {homeTotal}</span>}
                         </div>
-                        {homePoints > awayPoints && <span className="winner-label">Ganador</span>}
+                        {homeMissing > 0 && (
+                            <div className="lineup-penalty-detail">
+                                <span className="penalty-icon">⚠️</span>
+                                <span>{homeMissing} jugador(es) faltante(s)</span>
+                                <span className="penalty-pts">-{homeMissing * 5} pts</span>
+                            </div>
+                        )}
+                        {homePoints > awayPoints && <span className="winner-label">Ganador Partido</span>}
                     </div>
 
                     <div className="match-vs-divider">VS</div>
@@ -153,10 +190,34 @@ function MatchDetail({ match, championshipId, roundId, onClose }) {
                         </div>
                         <div className={`score-display ${awayPoints > homePoints ? 'score-winner' : ''}`}>
                             {awayPoints}
+                            {roundIds.length > 1 && <span className="score-total-badge">Total: {awayTotal}</span>}
                         </div>
-                        {awayPoints > homePoints && <span className="winner-label">Ganador</span>}
+                        {awayMissing > 0 && (
+                            <div className="lineup-penalty-detail">
+                                <span className="penalty-icon">⚠️</span>
+                                <span>{awayMissing} jugador(es) faltante(s)</span>
+                                <span className="penalty-pts">-{awayMissing * 5} pts</span>
+                            </div>
+                        )}
+                        {awayPoints > homePoints && <span className="winner-label">Ganador Partido</span>}
                     </div>
                 </div>
+
+                {/* Penalty Banner (if any team is incomplete) */}
+                {(homeMissing > 0 || awayMissing > 0) && (
+                    <div className="lineup-penalty-banner">
+                        <span className="penalty-banner-icon">⚠️</span>
+                        <div className="penalty-banner-text">
+                            <strong>LEY ENIGMA: Alineación Incompleta</strong>
+                            {homeMissing > 0 && (
+                                <span>{match.homeName}: {homeMissing} enigma(s) detectado(s) → <strong>-{homeMissing * 5} pts</strong></span>
+                            )}
+                            {awayMissing > 0 && (
+                                <span>{match.awayName}: {awayMissing} enigma(s) detectado(s) → <strong>-{awayMissing * 5} pts</strong></span>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Content Area - Scrollable */}
                 <div className="lineups-scroll-area">
