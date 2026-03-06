@@ -251,6 +251,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                     sanctionsData={sanctionsData.teamStats || {}}
                     isCopa={championship?.type === 'copa'}
                     rounds={rounds}
+                    championship={championship}
                     championshipId={championship?._id}
                     cupData={cupData}
                     copaAnalysis={copaAnalysis}

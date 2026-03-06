@@ -2,8 +2,33 @@ import { useState, useMemo, useEffect } from 'react';
 import { AlertCircle, ChevronDown, ChevronRight, Euro, Search, Calculator, Loader2 } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 import { CopaSanctionsService } from '../services/copaSanctionsService';
+import historicalFines from '../data/historical_fines.json';
 
-function SanctionsPanel({ sanctionsData, isCopa, rounds, championshipId, cupData, copaAnalysis }) {
+// Pre-compute normalized map for blurry matching (removes emojis, spaces, accents, and cases)
+const normalizedFines = {};
+Object.entries(historicalFines).forEach(([key, value]) => {
+    // Keep only letters and numbers
+    const norm = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+    normalizedFines[norm] = value;
+});
+
+// Lookup multa de primera vuelta por nombre de equipo
+function findHistoricalFine(teamName, championship) {
+    if (!teamName || !championship || championship.type === 'copa') return null;
+
+    // 1. Exact match
+    const exact = historicalFines[teamName.trim()];
+    if (exact !== undefined) return exact;
+
+    // 2. Normalized match (useful for when API changes spacing, emojis or case vs HTML backup)
+    const normName = teamName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normValue = normalizedFines[normName];
+    if (normValue !== undefined) return normValue;
+
+    return null;
+}
+
+function SanctionsPanel({ sanctionsData, isCopa, rounds, championship, championshipId, cupData, copaAnalysis }) {
     const [expandedTeam, setExpandedTeam] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -100,69 +125,91 @@ function SanctionsPanel({ sanctionsData, isCopa, rounds, championshipId, cupData
             )}
 
             <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
-                {sortedTeams.map((team, idx) => (
-                    <div key={team.id || `team-${idx}`} className="card" style={{ padding: '0', overflow: 'hidden' }}>
-                        <div
-                            onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
-                            style={{
-                                padding: '1rem',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                                background: expandedTeam === team.id ? 'rgba(255,255,255,0.03)' : 'transparent'
-                            }}
-                        >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                {expandedTeam === team.id ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <img
-                                        src={getTeamShield(team.name)}
-                                        alt=""
-                                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
-                                        onError={(e) => { e.target.style.display = 'none'; }}
-                                    />
-                                    <span style={{ fontWeight: 600 }}>{team.name}</span>
+                {sortedTeams.map((team, idx) => {
+                    const historicalFine = findHistoricalFine(team.name, championship);
+                    return (
+                        <div key={team.id || `team-${idx}`} className="card" style={{ padding: '0', overflow: 'hidden' }}>
+                            <div
+                                onClick={() => setExpandedTeam(expandedTeam === team.id ? null : team.id)}
+                                style={{
+                                    padding: '1rem',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    cursor: 'pointer',
+                                    background: expandedTeam === team.id ? 'rgba(255,255,255,0.03)' : 'transparent'
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    {expandedTeam === team.id ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        <img
+                                            src={getTeamShield(team.name)}
+                                            alt=""
+                                            style={{ width: '20px', height: '20px', objectFit: 'contain' }}
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                        <span style={{ fontWeight: 600 }}>{team.name}</span>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                                        {team.total}€
+                                        <Euro size={18} />
+                                    </div>
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#ef4444', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                                {team.total}€
-                                <Euro size={18} />
-                            </div>
-                        </div>
 
-                        {expandedTeam === team.id && (
-                            <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                {team.breakdown.length === 0 ? (
-                                    <p style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.9rem' }}>Sin sanciones registradas.</p>
-                                ) : (
-                                    <div className="responsive-table-container">
-                                        <table style={{ width: '100%', fontSize: '0.85rem', marginTop: '1rem', minWidth: '500px' }}>
-                                            <thead>
-                                                <tr style={{ textAlign: 'left', opacity: 0.5 }}>
-                                                    <th style={{ paddingBottom: '0.5rem' }}>Jornada</th>
-                                                    <th style={{ paddingBottom: '0.5rem' }}>Motivo</th>
-                                                    <th style={{ paddingBottom: '0.5rem' }}>Detalle</th>
-                                                    <th style={{ paddingBottom: '0.5rem', textAlign: 'right' }}>Coste</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {team.breakdown.map((item, idx) => (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                                        <td style={{ padding: '0.4rem 0' }}>{isCopa ? `R${item.round}` : `J${item.round}`}</td>
-                                                        <td style={{ padding: '0.4rem 0', color: '#fca5a5' }}>{item.type}</td>
-                                                        <td style={{ padding: '0.4rem 0', opacity: 0.8 }}>{item.detail}</td>
-                                                        <td style={{ padding: '0.4rem 0', textAlign: 'right', fontWeight: 'bold' }}>{item.cost}€</td>
+                            {/* Multa primera vuelta — ítem siempre visible cuando existe */}
+                            {historicalFine !== null && (
+                                <div style={{
+                                    padding: '0.4rem 1rem 0.4rem 3.5rem',
+                                    borderTop: '1px solid rgba(251,191,36,0.12)',
+                                    background: 'rgba(251,191,36,0.04)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                }}>
+                                    <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>Multas primera vuelta</span>
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fbbf24' }}>
+                                        {historicalFine.toFixed(2)}€
+                                    </span>
+                                </div>
+                            )}
+
+                            {expandedTeam === team.id && (
+                                <div style={{ padding: '0 1rem 1rem 1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    {team.breakdown.length === 0 ? (
+                                        <p style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.9rem' }}>Sin sanciones registradas.</p>
+                                    ) : (
+                                        <div className="responsive-table-container">
+                                            <table style={{ width: '100%', fontSize: '0.85rem', marginTop: '1rem', minWidth: '500px' }}>
+                                                <thead>
+                                                    <tr style={{ textAlign: 'left', opacity: 0.5 }}>
+                                                        <th style={{ paddingBottom: '0.5rem' }}>Jornada</th>
+                                                        <th style={{ paddingBottom: '0.5rem' }}>Motivo</th>
+                                                        <th style={{ paddingBottom: '0.5rem' }}>Detalle</th>
+                                                        <th style={{ paddingBottom: '0.5rem', textAlign: 'right' }}>Coste</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                ))}
+                                                </thead>
+                                                <tbody>
+                                                    {team.breakdown.map((item, idx) => (
+                                                        <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                                            <td style={{ padding: '0.4rem 0' }}>{isCopa ? `R${item.round}` : `J${item.round}`}</td>
+                                                            <td style={{ padding: '0.4rem 0', color: '#fca5a5' }}>{item.type}</td>
+                                                            <td style={{ padding: '0.4rem 0', opacity: 0.8 }}>{item.detail}</td>
+                                                            <td style={{ padding: '0.4rem 0', textAlign: 'right', fontWeight: 'bold' }}>{item.cost}€</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
