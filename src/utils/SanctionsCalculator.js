@@ -112,12 +112,17 @@ function processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts,
             // Check existing sanctions
             const active = sanctionsRegistry[teamId]?.[normPlayer];
             if (active) {
+                // Note: We identify infractions for historical data but we DO NOT register them
+                // because their financial cost is already included in the historical_fines.json
+                // from the first half of the season.
+                /*
                 const infType = rNum <= active.outTeamUntil ? 'Alineación Sancionado' :
                     (rNum <= active.noCaptUntil ? 'Capitán Sancionado' : null);
 
                 if (infType) {
                     registerInfraction(teamId, playerName, rNum, `Infracción Histórica: ${infType}`, teamStats, infractions);
                 }
+                */
             }
 
             // Update captain counts & history

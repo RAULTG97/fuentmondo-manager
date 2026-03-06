@@ -12,6 +12,12 @@ Object.entries(historicalFines).forEach(([key, value]) => {
     normalizedFines[norm] = value;
 });
 
+// Alias map for teams that changed their names in the 2nd half of the season
+const TEAM_ALIASES = {
+    "cangrenafc": "limhijodeputa",
+    "huevitosbailarinesfc": "realbailarinesfc"
+};
+
 // Lookup multa de primera vuelta por nombre de equipo
 function findHistoricalFine(teamName, championship) {
     if (!teamName || !championship || championship.type === 'copa') return null;
@@ -21,7 +27,13 @@ function findHistoricalFine(teamName, championship) {
     if (exact !== undefined) return exact;
 
     // 2. Normalized match (useful for when API changes spacing, emojis or case vs HTML backup)
-    const normName = teamName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+    let normName = teamName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Check aliases
+    if (TEAM_ALIASES[normName]) {
+        normName = TEAM_ALIASES[normName];
+    }
+
     const normValue = normalizedFines[normName];
     if (normValue !== undefined) return normValue;
 
