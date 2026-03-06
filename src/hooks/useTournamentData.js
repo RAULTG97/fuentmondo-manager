@@ -407,13 +407,27 @@ export const useTournamentData = (activeTab) => {
             // Verify if selected round is "live" (current or future-but-active)
             const roundObj = rounds.find(r => r.number === selectedRoundId || r._id === selectedRoundId);
             const isRoundLive = selectedRoundId === currentRoundNumber ||
-                (roundObj && roundObj.status === 'current');
+                (roundObj && roundObj.status === 'current') ||
+                (roundObj && roundObj.number === 23);
 
-            const data = await fetchWithRetry(getInternalRankingRound, championship._id, actualIdForAPI, isRoundLive);
+            let data = null;
+            try {
+                data = await fetchWithRetry(getInternalRankingRound, championship._id, actualIdForAPI, isRoundLive);
+            } catch (apiErr) {
+                console.error(`[API ERROR] Failed to fetch ranking for R${selectedRoundId}:`, apiErr);
+                // Recovery for J23: If API fails, use matches from the calendar (allRounds)
+                if (selectedRoundId === 23 && hasCachedMatches) {
+                    console.log("[RECOVERY] Using calendar matches for J23 recovery.");
+                    data = { matches: cachedRound.matches, ranking: [] };
+                } else {
+                    throw apiErr;
+                }
+            }
+
             if (!data) return;
 
             const rankList = data.ranking || [];
-            setRanking(rankList);
+            if (rankList.length > 0) setRanking(rankList);
 
             if (data.matches) {
                 const indexToName = {};
@@ -426,8 +440,10 @@ export const useTournamentData = (activeTab) => {
                 const processed = data.matches.map(m => {
                     const pIds = m.p || [];
                     const scores = m.m || [0, 0];
-                    const homeTeamId = indexToRealId[pIds[0]];
-                    const awayTeamId = indexToRealId[pIds[1]];
+
+                    // In recovery mode (rankList empty), we trust existing IDs/Names in the match object
+                    const homeTeamId = indexToRealId[pIds[0]] || m.homeTeamId;
+                    const awayTeamId = indexToRealId[pIds[1]] || m.awayTeamId;
 
                     // Check if we already have enriched data for this match in cache or current state
                     const existingMatch = matches.find(em => em.homeTeamId === homeTeamId && em.awayTeamId === awayTeamId) ||
@@ -436,19 +452,16 @@ export const useTournamentData = (activeTab) => {
                     return {
                         ...m,
                         p: pIds,
-                        homeName: indexToName[pIds[0]] || "Unknown",
-                        awayName: indexToName[pIds[1]] || "Unknown",
+                        homeName: indexToName[pIds[0]] || m.homeName || "Unknown",
+                        awayName: indexToName[pIds[1]] || m.awayName || "Unknown",
                         homeTeamId,
                         awayTeamId,
                         homeScore: scores[0],
                         awayScore: scores[1],
-                        // Preserve enriched data if available to avoid UI flashing "Pending"
+                        // Preserve enriched data if available
                         enriched: existingMatch?.enriched || false,
                         lineupA: existingMatch?.lineupA || [],
                         lineupB: existingMatch?.lineupB || [],
-                        // If we have preserved enriched data, we should probably treat it as such, 
-                        // but strictly speaking the NEW scores might imply point changes that won't be in lineupA/B yet.
-                        // However, keeping them prevents the "basic view" fallback.
                     };
                 });
 
@@ -465,22 +478,18 @@ export const useTournamentData = (activeTab) => {
                     });
                 }
 
-                // Only enrich with lineup data if this is the current/live round
-                // For past rounds, we rely on cached data from allRounds or skip enrichment
+                // Force enrichment for J23 or current round
                 const roundNumber = typeof selectedRoundId === 'number' ? selectedRoundId : null;
                 const isCurrentRound = roundNumber === currentRoundNumber;
+                const isJ23 = roundNumber === 23;
 
-                if (isCurrentRound) {
-                    // Live round: fetch fresh lineup data with short TTL
+                if (isCurrentRound || isJ23) {
                     enrichCurrentMatches(processed, championship._id, actualIdForAPI, roundNumber);
                 } else {
-                    // Past/future round: check if we already have enriched data in allRounds
                     const cachedRound = allRoundsRef.current.find(r => r.number === roundNumber);
                     if (cachedRound?.matches?.some(m => m.enriched)) {
-                        // Use cached enriched data
                         setMatches(cachedRound.matches);
                     }
-                    // Otherwise, just use the basic scores from the ranking API (already set above)
                 }
             }
         } catch (err) {
@@ -558,9 +567,10 @@ export const useTournamentData = (activeTab) => {
         // --- CACHE INVALIDATION: Force refetch of current and adjacent rounds ---
         // This ensures sanctions and lineups update when a round finishes or starts.
         roundsToFetch.forEach(r => {
-            // Invalidate current round and one before/after to handle transitions safely
+            // Invalidate current round, suspended rounds (J23), and one before/after
             const isLiveOrRecent = r.status === 'current' ||
                 Math.abs(r.number - currentRoundNumber) <= 1 ||
+                r.number === 23 ||
                 (r.status === 'past' && r.number === currentRoundNumber);
 
             if (isLiveOrRecent) {
@@ -575,21 +585,27 @@ export const useTournamentData = (activeTab) => {
             const allRoundDataCombined = [];
             // Batch fetch historical rankings for ALL past rounds
             const neededFetch = roundsToFetch.filter(r => !historicalCache.current[r._id]);
-            const batchSizeFetch = 5;
+            const batchSizeFetch = 2; // Reduced for reliability
             for (let i = 0; i < neededFetch.length; i += batchSizeFetch) {
                 const batch = neededFetch.slice(i, i + batchSizeFetch);
-                // Force isLive=true for the current round to bypass 24h cache and ensure fresh sanctions/scores
                 const results = await Promise.all(batch.map(r => {
-                    const isLive = r.status === 'current' || r.number === currentRoundNumber;
-                    return getInternalRankingRound(championship._id, r._id, isLive).catch(() => null);
+                    const isLive = r.status === 'current' || r.number === currentRoundNumber || r.number === 23;
+                    return fetchWithRetry(getInternalRankingRound, championship._id, r._id, isLive).catch(err => {
+                        console.error(`[INTERNAL] Failed to fetch ranking for R${r.number} (${r._id}):`, err);
+                        return null;
+                    });
                 }));
-                results.forEach((data, idx) => {
-                    if (data) {
-                        const roundInfo = batch[idx];
-                        const idxToId = {};
-                        data.ranking?.forEach((t, i) => idxToId[i + 1] = t._id);
 
-                        // Process matches to add homeTeamId/awayTeamId and scores
+                results.forEach((data, idx) => {
+                    const roundInfo = batch[idx];
+                    if (data) {
+                        const idxToId = {};
+                        const idxToName = {};
+                        data.ranking?.forEach((t, i) => {
+                            idxToId[i + 1] = t._id;
+                            idxToName[i + 1] = t.name;
+                        });
+
                         if (data.matches) {
                             data.matches = data.matches.map(m => {
                                 const pIds = m.p || [];
@@ -598,6 +614,8 @@ export const useTournamentData = (activeTab) => {
                                     ...m,
                                     homeTeamId: idxToId[pIds[0]],
                                     awayTeamId: idxToId[pIds[1]],
+                                    homeName: idxToName[pIds[0]] || "Unknown",
+                                    awayName: idxToName[pIds[1]] || "Unknown",
                                     homeScore: scores[0] || 0,
                                     awayScore: scores[1] || 0
                                 };
@@ -612,24 +630,54 @@ export const useTournamentData = (activeTab) => {
             roundsToFetch.forEach(r => {
                 if (historicalCache.current[r._id]) {
                     allRoundDataCombined.push(historicalCache.current[r._id]);
+                } else if (r.number === 23) {
+                    // Recovery for J23: Use calendar data if ranking fetch failed
+                    const calendarJ23 = allRounds.find(x => x.number === 23);
+                    if (calendarJ23 && calendarJ23.matches) {
+                        console.log("[CALC RECOVERY] Pulling J23 matches from calendar.");
+
+                        // Deep copy matches to ensure state updates trigger re-renders
+                        const recoveredMatches = calendarJ23.matches.map(m => ({ ...m }));
+
+                        // Reconstruct ranking array for tools that depend on it
+                        const reconstructedRanking = [];
+                        const seenIds = new Set();
+                        recoveredMatches.forEach(m => {
+                            [{ id: m.homeTeamId, name: m.homeName }, { id: m.awayTeamId, name: m.awayName }].forEach(t => {
+                                if (t.id && !seenIds.has(t.id)) {
+                                    reconstructedRanking.push({ _id: t.id, name: t.name, points: 0 });
+                                    seenIds.add(t.id);
+                                }
+                            });
+                        });
+
+                        const recoveredData = {
+                            _id: calendarJ23._id || "j23-recovery",
+                            number: 23,
+                            matches: recoveredMatches,
+                            ranking: reconstructedRanking
+                        };
+                        allRoundDataCombined.push(recoveredData);
+                        historicalCache.current[recoveredData._id] = recoveredData;
+                    }
                 }
             });
 
-            // --- CRITICAL FIX: Fetch missing lineups for sanctions logic ---
-            // Sanctions calculation depends on knowing who was captain in every match.
+            // Enrichment (Penalties/Lineups)
             if (isSanctionView) {
                 const roundsNeedingEnrichment = allRoundDataCombined.filter(rd =>
-                    rd.matches && rd.matches.some(m => !m.lineupA || m.lineupA.length === 0)
+                    rd.matches && (rd.matches.some(m => !m.lineupA || m.lineupA.length === 0) || rd.number === 23)
                 );
+
+                console.log(`[ENRICH] Found ${roundsNeedingEnrichment.length} rounds needing enrichment including J23.`);
 
                 for (const rd of roundsNeedingEnrichment) {
                     const rId = rd._id;
                     const isRoundLive = rd.number === currentRoundNumber;
 
-                    // Fetch lineups for each match in the round
                     const batchSizeLineups = 4;
-                    for (let i = 0; i < rd.matches.length; i += batchSizeLineups) {
-                        const matchBatch = rd.matches.slice(i, i + batchSizeLineups);
+                    for (let n = 0; n < rd.matches.length; n += batchSizeLineups) {
+                        const matchBatch = rd.matches.slice(n, n + batchSizeLineups);
                         await Promise.all(matchBatch.map(async (m) => {
                             if (!m.homeTeamId || !m.awayTeamId) return;
                             try {
@@ -637,67 +685,91 @@ export const useTournamentData = (activeTab) => {
                                     fetchWithRetry(getInternalLineup, championship._id, m.homeTeamId, rId, isRoundLive),
                                     fetchWithRetry(getInternalLineup, championship._id, m.awayTeamId, rId, isRoundLive)
                                 ]);
+
                                 m.lineupA = resH.players?.initial || resH.players || [];
                                 m.lineupB = resA.players?.initial || resA.players || [];
 
-                                // Lineup incompleteness penalty: -5 pts per missing player
+                                // Force recalculation from lineup points
+                                const sH = m.lineupA.reduce((acc, p) => acc + (p.points || 0), 0);
+                                const sA = m.lineupB.reduce((acc, p) => acc + (p.points || 0), 0);
+
                                 const { penaltyPoints: penH, missingPlayers: missH } = calcLineupPenalty(m.lineupA);
                                 const { penaltyPoints: penA, missingPlayers: missA } = calcLineupPenalty(m.lineupB);
-                                if (penH < 0) { m.homeScore = (m.homeScore || 0) + penH; m.homePenalty = penH; m.homeMissing = missH; }
-                                if (penA < 0) { m.awayScore = (m.awayScore || 0) + penA; m.awayPenalty = penA; m.awayMissing = missA; }
-                                // Sync m[] array so StandingsCalculator reads penalised scores
-                                m.m = [m.homeScore || 0, m.awayScore || 0];
+
+                                m.homeScore = sH + penH;
+                                m.awayScore = sA + penA;
+                                m.homePenalty = penH;
+                                m.awayPenalty = penA;
+                                m.homeMissing = missH;
+                                m.awayMissing = missA;
+
+                                m.m = [m.homeScore, m.awayScore];
                                 m.enriched = true;
-                            } catch (e) { /* silent catch */ }
+                                if (rd.number === 23) console.log(`[J23 SYNC] Corrected ${m.homeName} score: ${m.homeScore}`);
+                            } catch (e) {
+                                console.error(`[ENRICH ERROR] R${rd.number}:`, e);
+                            }
                         }));
                     }
-                    // Update cache with enriched round
                     historicalCache.current[rId] = { ...rd };
                 }
-                // Refresh allRoundDataCombined after enrichment to ensure worker gets the objects with lineups
-                allRoundDataCombined.length = 0;
-                roundsToFetch.forEach(r => {
-                    if (historicalCache.current[r._id]) {
-                        allRoundDataCombined.push(historicalCache.current[r._id]);
-                    }
+
+                // Force synchronization to allRounds
+                setAllRounds(prev => {
+                    return prev.map(r => {
+                        const enriched = historicalCache.current[r._id] ||
+                            Object.values(historicalCache.current).find(rd => rd.number === r.number);
+
+                        if (enriched && (enriched.number === 23 || enriched.number === currentRoundNumber)) {
+                            return { ...r, matches: [...enriched.matches], styles: 'cached' };
+                        }
+                        return r;
+                    });
                 });
             }
 
             const needsSanctionsData = isSanctionView || ['standings', 'calendar'].includes(activeTab);
 
             if (needsSanctionsData) {
+                // CRITICAL: Rebuild allRoundDataCombined from cache AFTER enrichment
+                // so the worker receives the enriched scores (not the stale API values)
+                allRoundDataCombined.length = 0;
+                roundsToFetch.forEach(r => {
+                    if (historicalCache.current[r._id]) {
+                        allRoundDataCombined.push(historicalCache.current[r._id]);
+                    } else {
+                        // Fallback: check by round number (e.g. J23 recovered with different _id)
+                        const bynumber = Object.values(historicalCache.current).find(rd => rd.number === r.number);
+                        if (bynumber) allRoundDataCombined.push(bynumber);
+                    }
+                });
+
                 const sCalc = await import('../utils/SanctionsCalculator');
                 const allTeamsMap = new Map();
-                // 1. Build teamList from ALL rankings found in API (J20+)
                 allRoundDataCombined.forEach(rd => rd.ranking?.forEach(t => allTeamsMap.set(t._id, t)));
 
-                // 2. IMPORTANT: Add teams from the historical file (J1-J19) that might not be in J20+
+                // 2. IMPORTANT: Add teams from the historical file (J1-J19)
                 const histRankings = await import('../data/historical_rankings.json');
                 Object.keys(histRankings.default || {}).forEach(name => {
-                    const resolvedName = name; // Resolver logic handles mapping later
-                    // We don't have IDs for J1-J19 ONLY teams, but SanctionsCalculator needs 
-                    // a complete teamList to know which names are valid to resolve.
-                    // Actually, teamList is used to map resolvedName -> ID in SanctionsCalculator:41
+                    const exists = Array.from(allTeamsMap.values()).some(t => t.name === name);
+                    if (!exists) {
+                        allTeamsMap.set(name, { _id: name, name: name });
+                    }
+                });
+
+                const filteredRounds = allRoundDataCombined.map(rd => {
+                    const isCurrentRoundData = rd.number === currentRoundNumber;
+                    if (isCurrentRoundData && matches && matches.length > 0) {
+                        if (selectedRoundId === currentRoundNumber) return { ...rd, matches: matches };
+                    }
+                    return rd;
+                }).filter(rd => {
+                    if (rd.number === 23 && rd.matches && rd.matches.length > 0) return true;
+                    return rd.ranking && rd.ranking.length > 0 && rd.matches && rd.matches.length > 0;
                 });
 
                 const teamList = Array.from(allTeamsMap.values());
                 teamList.__championshipName = championship.name;
-
-                // --- OPTIMIZATION: Early Standings Calculate & Set ---
-                const filteredRounds = allRoundDataCombined.map(rd => {
-                    // Check if we have live matches for this round in the state
-                    const isCurrentRoundData = rd.number === currentRoundNumber;
-                    if (isCurrentRoundData && matches && matches.length > 0) {
-                        if (selectedRoundId === currentRoundNumber) {
-                            return { ...rd, matches: matches };
-                        }
-                    }
-                    return rd;
-                }).filter(rd => {
-                    // Be more inclusive: if we have ranking and matches, we should process it.
-                    // This fixes missing data in sanctions panels.
-                    return rd.ranking && rd.ranking.length > 0 && rd.matches && rd.matches.length > 0;
-                });
 
                 // --- DELEGATE TO WORKER ---
                 if (workerRef.current) {
@@ -705,14 +777,11 @@ export const useTournamentData = (activeTab) => {
                         const { type, payload, error } = event.data;
                         if (type === 'CALCULATION_SUCCESS') {
                             const { standings, sanctions } = payload;
-
-                            // 1. Set initial standings for rapid feedback
                             setH2HStandings(standings);
                             setSanctionsData(sanctions);
                             setStandingsLoaded(true);
                             setLoadingStandings(false);
                             setLoadingAllLineups(false);
-
                             if (!isLive) lastCalculationDigest.current = digest;
                             isFetching.current = false;
                         } else if (type === 'CALCULATION_ERROR') {
@@ -725,23 +794,16 @@ export const useTournamentData = (activeTab) => {
                         type: 'CALCULATE_ALL',
                         payload: {
                             roundsData: filteredRounds,
-                            teamList: Array.from(allTeamsMap.values()),
+                            teamList: teamList,
                             championshipName: championship.name
                         }
                     });
+                } else {
+                    const standingsOnly = calculateH2HStandings(filteredRounds);
+                    setH2HStandings(standingsOnly);
+                    setStandingsLoaded(true);
+                    if (!isLive) lastCalculationDigest.current = digest;
                 }
-
-                return; // Exit early as worker handles the rest
-            } else {
-                // If not needing full sanctions data, at least set the standings
-                const standingsOnly = calculateH2HStandings(allRoundDataCombined.filter(rd => {
-                    return rd.ranking && rd.ranking.length > 0 && rd.matches && rd.matches.length > 0;
-                }));
-                setH2HStandings(standingsOnly);
-                setStandingsLoaded(true);
-
-                // --- DIGEST UPDATE ON BASIC SUCCESS ---
-                if (!isLive) lastCalculationDigest.current = digest;
             }
         } catch (e) {
             console.error("[CALC ERROR] Failed wide calculation:", e);
@@ -786,21 +848,18 @@ export const useTournamentData = (activeTab) => {
         if (!championship || championship.type !== 'copa' || activeTab !== 'copa') return;
 
         const intervalId = setInterval(() => {
-            // We use a specific fetch to avoid full reload if possible, 
-            // but loadCupData is already quite direct.
             loadCupData();
-        }, 30000); // 30 seconds for Copa (less aggressive than Liga to save API)
+        }, 30000);
 
         return () => clearInterval(intervalId);
     }, [championship, activeTab, loadCupData]);
 
-    // 5. Global Copa Analysis (Calculate Sanctions & Captains)
+    // 5. Global Copa Analysis
     useEffect(() => {
         if (championship?.type === 'copa' && cupData && !copaAnalysis && !loadingCup) {
             const runAnalysis = async () => {
                 setCalculationProgress(5);
                 try {
-                    // This triggers the heavy lifting: fetching all lineups and calculating sanctions
                     const result = await CopaSanctionsService.scanCopaAndCalculate(championship._id, cupData);
                     setCopaAnalysis(result);
                 } catch (err) {
@@ -813,12 +872,11 @@ export const useTournamentData = (activeTab) => {
         }
     }, [championship?._id, cupData, copaAnalysis, loadingCup, setCopaAnalysis]);
 
-    // 6. Automatic WhatsApp Notification for League Sanctions
+    // 6. Automatic WhatsApp Notification
     useEffect(() => {
         if (!championship || championship.type === 'copa') return;
         if (!currentRoundNumber || !sanctionsData?.activeSanctions?.length) return;
 
-        // Only notify for completed rounds to ensure data is final
         const currentRoundObj = rounds.find(r => r.number === currentRoundNumber);
         if (currentRoundObj?.status !== 'past') return;
 
@@ -826,13 +884,10 @@ export const useTournamentData = (activeTab) => {
         const alreadyNotified = localStorage.getItem(notifyKey);
 
         if (!alreadyNotified) {
-            console.log(`[Notification] Detectado cierre de jornada ${currentRoundNumber}. Enviando reporte...`);
-
             sendWhatsAppReport(sanctionsData.activeSanctions, currentRoundNumber, CONFIG.WHATSAPP.groupName)
                 .then(res => {
                     if (res?.success) {
                         localStorage.setItem(notifyKey, 'true');
-                        console.log(`[Notification] Reporte enviado y marcado como completado para J${currentRoundNumber}`);
                     }
                 })
                 .catch(err => console.error('[Notification] Error en envío automático:', err));

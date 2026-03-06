@@ -18,20 +18,32 @@ export function calculateH2HStandings(roundsData) {
     });
 
     roundsData.forEach(round => {
-        if (!round.matches || !round.ranking) return;
+        if (!round.matches) return;
 
         // Build a round-specific map for index resolution (1-indexed)
         const roundTeams = new Map();
-        round.ranking.forEach((t, idx) => roundTeams.set(idx + 1, t));
+        if (round.ranking) {
+            round.ranking.forEach((t, idx) => roundTeams.set(idx + 1, t));
+        }
 
         round.matches.forEach(match => {
             const [p1Idx, p2Idx] = match.p || [];
             const [score1, score2] = match.m || [0, 0];
 
-            if (p1Idx === undefined || p2Idx === undefined) return;
+            let team1, team2;
 
-            const team1 = roundTeams.get(p1Idx);
-            const team2 = roundTeams.get(p2Idx);
+            if (p1Idx !== undefined && p2Idx !== undefined && roundTeams.size > 0) {
+                team1 = roundTeams.get(p1Idx);
+                team2 = roundTeams.get(p2Idx);
+            }
+
+            // Fallback to direct IDs/Names if Ranking resolution failed or was missing
+            if (!team1 && match.homeTeamId) {
+                team1 = { _id: match.homeTeamId, name: match.homeName || "Unknown" };
+            }
+            if (!team2 && match.awayTeamId) {
+                team2 = { _id: match.awayTeamId, name: match.awayName || "Unknown" };
+            }
 
             if (!team1 || !team2) return;
 
