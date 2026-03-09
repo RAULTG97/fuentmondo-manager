@@ -16,6 +16,7 @@ export const useTournamentData = (activeTab) => {
     const isFetching = useRef(false);
     const allRoundsRef = useRef([]);
     const workerRef = useRef(null);
+    const enrichedRef = useRef(false); // Tracks enrichment state without causing re-renders
 
     // Initialize Worker
     useEffect(() => {
@@ -84,6 +85,8 @@ export const useTournamentData = (activeTab) => {
             setCalculationProgress(0);
             setAllRounds([]);
             historicalCache.current = {};
+            enrichedRef.current = false;
+            lastCalculationDigest.current = '';
 
             const league = championship.dataSourceChamp || 'espana';
             setLoadingDisplay(true);
@@ -542,8 +545,8 @@ export const useTournamentData = (activeTab) => {
         const currentRoundObj = allRounds.find(r => r.number === currentRoundNumber);
         const isLive = currentRoundObj?.status === 'current';
 
-        // Add a salt for enrichment status to allow re-runs when lineups are loaded
-        const enrichmentSalt = (isSanctionView && matches?.some(m => m.enriched)) ? 'enriched' : 'base';
+        // Use a ref-based salt to avoid adding `matches` as a dependency (would cause infinite loop)
+        const enrichmentSalt = enrichedRef.current ? 'enriched' : 'base';
 
         const digest = `${championship._id}_${currentRoundNumber}_${isSanctionView ? 'full' : 'basic'}_${isLive ? 'live' : 'static'}_${enrichmentSalt}`;
 
@@ -706,26 +709,24 @@ export const useTournamentData = (activeTab) => {
 
                                 m.m = [m.homeScore, m.awayScore];
                                 m.enriched = true;
-                                if (rd.number === 23) console.log(`[J23 SYNC] Corrected ${m.homeName} score: ${m.homeScore}`);
                             } catch (e) {
                                 console.error(`[ENRICH ERROR] R${rd.number}:`, e);
                             }
                         }));
                     }
                     historicalCache.current[rId] = { ...rd };
+                    enrichedRef.current = true;
                 }
 
-                // Force synchronization to allRounds
-                setAllRounds(prev => {
-                    return prev.map(r => {
-                        const enriched = historicalCache.current[r._id] ||
-                            Object.values(historicalCache.current).find(rd => rd.number === r.number);
+                // Sync only via ref to avoid triggering re-renders that would restart this calculation
+                allRoundsRef.current = allRoundsRef.current.map(r => {
+                    const enriched = historicalCache.current[r._id] ||
+                        Object.values(historicalCache.current).find(rd => rd.number === r.number);
 
-                        if (enriched && (enriched.number === 23 || enriched.number === currentRoundNumber)) {
-                            return { ...r, matches: [...enriched.matches], styles: 'cached' };
-                        }
-                        return r;
-                    });
+                    if (enriched && (enriched.number === 23 || enriched.number === currentRoundNumber)) {
+                        return { ...r, matches: [...enriched.matches], styles: 'cached' };
+                    }
+                    return r;
                 });
             }
 
@@ -821,7 +822,7 @@ export const useTournamentData = (activeTab) => {
             setLoadingAllLineups(false);
             isFetching.current = false;
         }
-    }, [championship, allRounds, selectedRoundId, currentRoundNumber, ranking, matches, activeTab]);
+    }, [championship, allRounds, selectedRoundId, currentRoundNumber, ranking, activeTab]);
 
     useEffect(() => {
         const needsCalc = ['dashboard', 'welcome', 'standings', 'captains', 'sanctions', 'infractions', 'restricted', 'teams', 'calendar', 'matchups', 'copa'].includes(activeTab);
