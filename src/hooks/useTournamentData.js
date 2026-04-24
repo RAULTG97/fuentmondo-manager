@@ -5,6 +5,7 @@ import { calculateH2HStandings } from '../utils/StandingsCalculator';
 import { CopaSanctionsService } from '../services/copaSanctionsService';
 import { sendWhatsAppReport } from '../utils/notifications';
 import { calcLineupPenalty } from '../utils/LineupPenaltyCalculator';
+import { resolveTeamName, normalizeName } from '../utils/TeamResolver';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -752,15 +753,15 @@ export const useTournamentData = (activeTab) => {
 
                 // 2. IMPORTANT: Add teams from the historical file (J1-J19) BUT ONLY if they belong to THIS championship
                 const histRankings = await import('../data/historical_rankings.json');
-                const validLeagueTeams = new Set((calendarData?.teams || []).map(t => t.name || t.n));
+                const validLeagueTeams = new Set((calendarData?.teams || []).map(t => normalizeName(t.name || t.n)));
 
                 Object.keys(histRankings.default || {}).forEach(name => {
                     // It belongs to this championship if the API calendar specifically listed it, 
                     // or if it was found in any real J20+ API round
-                    const belongsToChamp = validLeagueTeams.has(name) || Array.from(allTeamsMap.values()).some(t => t.name === name);
+                    const belongsToChamp = validLeagueTeams.has(name) || Array.from(allTeamsMap.values()).some(t => normalizeName(t.name) === name);
 
                     if (belongsToChamp) {
-                        const exists = Array.from(allTeamsMap.values()).some(t => t.name === name);
+                        const exists = Array.from(allTeamsMap.values()).some(t => normalizeName(t.name) === name);
                         if (!exists) {
                             allTeamsMap.set(name, { _id: name, name: name });
                         }
