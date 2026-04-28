@@ -152,39 +152,33 @@ const HallOfFame = () => {
                                     )}
                                 </div>
                             </div>
+
+                            <AnimatePresence>
+                                {showSpecialMeme && champ.team === 'SICARIOS CF' && champ.year === '2026' && (
+                                    <motion.div 
+                                        className="inline-special-meme"
+                                        initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                                        exit={{ opacity: 0, x: -20, scale: 0.8 }}
+                                        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                                    >
+                                        <div className="meme-wrapper">
+                                            <img 
+                                                src={getAssetPath('/bananeros_cry.png')} 
+                                                alt="Bananeros Cry Meme" 
+                                                className="inline-meme-img"
+                                            />
+                                            <button className="close-meme-mini" onClick={(e) => { e.stopPropagation(); setShowSpecialMeme(false); }}>
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     );
                 })}
             </div>
-
-            <AnimatePresence>
-                {showSpecialMeme && (
-                    <motion.div 
-                        className="special-meme-overlay"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => setShowSpecialMeme(false)}
-                    >
-                        <motion.div 
-                            className="special-meme-content"
-                            initial={{ scale: 0.8, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.8, y: 20 }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <button className="close-meme-btn" onClick={() => setShowSpecialMeme(false)}>
-                                <X size={24} />
-                            </button>
-                            <img 
-                                src={getAssetPath('/bananeros_cry.png')} 
-                                alt="Bananeros Cry Meme" 
-                                className="special-meme-img"
-                            />
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </div>
     );
 };
