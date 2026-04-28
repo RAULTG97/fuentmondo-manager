@@ -393,3 +393,64 @@
         align-items: flex-start;
     }
 }
+
+/* Special Meme Modal */
+.special-meme-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 2rem;
+}
+
+.special-meme-content {
+    position: relative;
+    max-width: 800px;
+    width: 100%;
+    background: #111;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+.special-meme-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.close-meme-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.close-meme-btn:hover {
+    background: var(--danger);
+    transform: rotate(90deg);
+}
+
+.special-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    opacity: 0.5;
+    animation: pulse-glow 2s infinite;
+}

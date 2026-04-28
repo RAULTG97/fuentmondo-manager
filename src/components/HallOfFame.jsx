@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Trophy, Star, Calendar, Crown } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, Star, Calendar, Crown, X } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
 import { getAssetPath } from '../utils/path';
 import './HallOfFame.css';
@@ -45,6 +45,8 @@ const champions = [
 ];
 
 const HallOfFame = () => {
+    const [showSpecialMeme, setShowSpecialMeme] = useState(false);
+
     React.useEffect(() => {
         const audio = new Audio(getAssetPath('/halloffame.mp3'));
         audio.volume = 0.5;
@@ -105,6 +107,12 @@ const HallOfFame = () => {
                             whileInView={{ opacity: 1, x: 0 }}
                             viewport={{ once: true, margin: "-50px" }}
                             transition={{ duration: 0.5, delay: index * 0.1 }}
+                            onClick={() => {
+                                if (champ.team === 'SICARIOS CF' && champ.year === '2026') {
+                                    setShowSpecialMeme(true);
+                                }
+                            }}
+                            style={{ cursor: (champ.team === 'SICARIOS CF' && champ.year === '2026') ? 'pointer' : 'default' }}
                         >
                             <div className="timeline-content">
                                 <div className={`champ-card glass-premium ${champ.type}`}>
@@ -136,12 +144,47 @@ const HallOfFame = () => {
                                         <span>CAMPEÓN OFICIAL</span>
                                         <Star size={14} className="star-icon" />
                                     </div>
+                                    
+                                    {champ.team === 'SICARIOS CF' && champ.year === '2026' && (
+                                        <div className="special-indicator">
+                                            <Star size={10} fill="var(--accent)" />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>
                     );
                 })}
             </div>
+
+            <AnimatePresence>
+                {showSpecialMeme && (
+                    <motion.div 
+                        className="special-meme-overlay"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowSpecialMeme(false)}
+                    >
+                        <motion.div 
+                            className="special-meme-content"
+                            initial={{ scale: 0.8, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.8, y: 20 }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button className="close-meme-btn" onClick={() => setShowSpecialMeme(false)}>
+                                <X size={24} />
+                            </button>
+                            <img 
+                                src={getAssetPath('/bananeros_cry.png')} 
+                                alt="Bananeros Cry Meme" 
+                                className="special-meme-img"
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
