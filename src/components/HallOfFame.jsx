@@ -35,6 +35,12 @@ const champions = [
         tournament: 'Copa Piraña',
         team: 'AL-CARRER F.C.',
         type: 'cup'
+    },
+    {
+        year: '2026',
+        tournament: 'Copa Piraña',
+        team: 'SICARIOS CF',
+        type: 'cup'
     }
 ];
 

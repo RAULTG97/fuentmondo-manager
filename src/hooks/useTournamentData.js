@@ -6,6 +6,7 @@ import { CopaSanctionsService } from '../services/copaSanctionsService';
 import { sendWhatsAppReport } from '../utils/notifications';
 import { calcLineupPenalty } from '../utils/LineupPenaltyCalculator';
 import { resolveTeamName, normalizeName } from '../utils/TeamResolver';
+import { normalizeRoundNumbers } from '../utils/roundNormalizer';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
@@ -98,6 +99,11 @@ export const useTournamentData = (activeTab) => {
 
                 const rList = data.rounds || [];
                 rList.sort((a, b) => b.number - a.number);
+                
+                // Normalizar números de jornada (fix para anomalías de la API como 31.5)
+                const normalizedList = normalizeRoundNumbers(rList);
+                normalizedList.forEach((r, i) => { rList[i] = r; }); // actualizar in-place
+                
                 rList.forEach(r => {
                     if (!r.date && r.matches?.length > 0) r.date = r.matches[0].date;
                 });
