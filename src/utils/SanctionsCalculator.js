@@ -4,6 +4,7 @@
  */
 
 import historicalCaptains from '../data/historical_captains.json';
+import historicalFines from '../data/historical_fines.json';
 import { resolveTeamName, normalizeName } from './TeamResolver';
 import { CONFIG } from '../config';
 
@@ -70,6 +71,9 @@ export function calculateSanctions(roundsData, teamList = []) {
 
     // 3. Copa Special Fees
     applyCopaFees(teamList, teamStats);
+
+    // 4. Multas 1ª Vuelta (datos históricos pre-calculados)
+    applyHistoricalFines(teamList, teamStats);
 
     return {
         teamStats,
@@ -315,6 +319,35 @@ function applyPerformancePenalties(round, data, teamStats) {
             }
         });
     }
+}
+
+/**
+ * Suma las multas de la primera vuelta (historical_fines.json) al total de cada equipo.
+ * Se llama al final del cálculo para incluir tanto J1-J19 como J20-J38.
+ */
+function applyHistoricalFines(teamList, teamStats) {
+    // Mapa normalizado: nombre resuelto -> teamId
+    const nameToId = {};
+    teamList.forEach(team => {
+        const tid = team.id || team._id;
+        if (tid) nameToId[cachedResolveTeam(team.name)] = tid;
+    });
+
+    Object.entries(historicalFines).forEach(([teamName, amount]) => {
+        if (!amount || amount <= 0) return;
+        const resolvedKey = cachedResolveTeam(teamName);
+        const teamId = nameToId[resolvedKey];
+        if (!teamId || !teamStats[teamId]) return;
+
+        teamStats[teamId].total += amount;
+        // Añadir al principio del desglose para visibilidad
+        teamStats[teamId].breakdown.unshift({
+            round: 0,
+            type: 'Multas 1ª Vuelta',
+            detail: 'Acumulado jornadas 1-19',
+            cost: amount
+        });
+    });
 }
 
 /**
