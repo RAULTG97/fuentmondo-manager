@@ -54,8 +54,9 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
     const [selectedMatch, setSelectedMatch] = useState(null);
     const [selectedMatchRoundId, setSelectedMatchRoundId] = useState(null);
     const [selectedDetailTeam, setSelectedDetailTeam] = useState(null);
-    const [expandedVuelta, setExpandedVuelta] = useState(null); // null | 1 | 2
+    const [expandedVuelta, setExpandedVuelta] = useState(null);
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+    const [sanctionsMode, setSanctionsMode] = useState(false);
 
     // Sync championship with context
     useEffect(() => {
@@ -136,103 +137,214 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                 // Fallback to old behavior for Copa or when allRounds not ready
                 const roundStatus = isHistoricalRound ? 'historical' : 'current';
                 return <MatchupsList matches={matches} onMatchClick={handleMatchClick} isLiveRound={selectedRoundId === activeRoundNum} roundStatus={roundStatus} />;
-            case 'standings':
+            case 'standings': {
                 if (loadingStandings) return <TableSkeleton rows={10} columns={12} />;
+
+                // --- CSV EXPORT HELPER ---
+                const exportCSV = () => {
+                    let csv, filename;
+                    if (sanctionsMode) {
+                        const header = 'Pos,Equipo,Total Sanciones (€)';
+                        const rows = h2hStandings.map((team, idx) => {
+                            const total = sanctionsData.teamStats?.[team.id]?.total ?? 0;
+                            return `${idx + 1},"${team.name}",${total.toFixed(2)}`;
+                        });
+                        csv = [header, ...rows].join('\n');
+                        filename = `sanciones_${championship.name.replace(/\s+/g,'_')}.csv`;
+                    } else {
+                        const header = 'Pos,Equipo,Total Pts,Total Gen,1ª V Pts,1ª V Gen,2ª V Pts,PJ,PG,PE,PP,GF';
+                        const rows = h2hStandings.map((team, idx) =>
+                            `${idx + 1},"${team.name}",${team.points + team.hist_pts},${team.gf + team.hist_gen},${team.hist_pts},${team.hist_gen},${team.points},${team.played},${team.won},${team.drawn},${team.lost},${team.gf}`
+                        );
+                        csv = [header, ...rows].join('\n');
+                        filename = `clasificacion_${championship.name.replace(/\s+/g,'_')}.csv`;
+                    }
+                    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = filename; a.click();
+                    URL.revokeObjectURL(url);
+                };
+
                 return (
                     <div className="standings-view animate-in">
-                        <table>
-                            <thead>
-                                <tr className="table-header-main">
-                                    <th className="sticky-col-1-2" colSpan={2}></th>
-                                    <th colSpan={2} className="hide-mobile" style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
-                                    <th colSpan={2} className="show-mobile-table-cell sticky-col-3-4" style={{ background: 'rgba(59, 130, 246, 0.1)', textAlign: 'center', fontSize: '0.7rem', letterSpacing: '0.1em' }}>GLOBAL</th>
-                                    <th
-                                        colSpan={expandedVuelta === 1 ? 2 : 1}
-                                        className={`clickable-header ${expandedVuelta === 1 ? 'expanded' : 'collapsed'} hide-mobile`}
-                                        onClick={() => setExpandedVuelta(expandedVuelta === 1 ? null : 1)}
-                                        style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center', cursor: 'pointer' }}
-                                    >
-                                        <span className="hide-mobile">{expandedVuelta === 1 ? '1ª Vuelta' : '1ª V'}</span>
-                                        <span className="show-mobile-inline">{expandedVuelta === 1 ? '1ªV' : '1ªV'}</span>
-                                        {expandedVuelta === 1 ? ' ▾' : ' ▸'}
-                                    </th>
-                                    <th
-                                        colSpan={expandedVuelta === 2 ? 6 : 1}
-                                        className={`clickable-header ${expandedVuelta === 2 ? 'expanded' : 'collapsed'} hide-mobile`}
-                                        onClick={() => setExpandedVuelta(expandedVuelta === 2 ? null : 2)}
-                                        style={{ background: 'rgba(168, 85, 247, 0.05)', textAlign: 'center', cursor: 'pointer' }}
-                                    >
-                                        <span className="hide-mobile">{expandedVuelta === 2 ? '2ª Vuelta' : '2ª V'}</span>
-                                        <span className="show-mobile-inline">{expandedVuelta === 2 ? '2ªV' : '2ªV'}</span>
-                                        {expandedVuelta === 2 ? ' ▾' : ' ▸'}
-                                    </th>
-                                </tr>
-                                <tr className="table-header-sub">
-                                    <th className="sticky-col-1">Pos</th><th className="sticky-col-2">Equipo</th>
-                                    <th className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
-                                    <th className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
+                        {/* Toolbar */}
+                        <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+                            gap: '0.5rem', padding: '0.6rem 1rem', borderBottom: '1px solid var(--glass-border)'
+                        }}>
+                            <button
+                                id="btn-toggle-sanctions"
+                                onClick={() => setSanctionsMode(prev => !prev)}
+                                style={{
+                                    padding: '0.35rem 0.9rem', borderRadius: '999px', border: '1px solid',
+                                    cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em',
+                                    transition: 'all 0.2s',
+                                    background: sanctionsMode ? 'var(--error)' : 'transparent',
+                                    borderColor: sanctionsMode ? 'var(--error)' : 'var(--glass-border)',
+                                    color: sanctionsMode ? '#fff' : 'var(--text-dim)'
+                                }}
+                            >
+                                {sanctionsMode ? '⚔️ VER CLASIFICACIÓN' : '💰 VER SANCIONES'}
+                            </button>
+                            <button
+                                id="btn-export-csv"
+                                onClick={exportCSV}
+                                title="Exportar a CSV"
+                                style={{
+                                    padding: '0.35rem 0.9rem', borderRadius: '999px', cursor: 'pointer',
+                                    border: '1px solid var(--glass-border)', background: 'transparent',
+                                    color: 'var(--text-dim)', fontSize: '0.75rem', fontWeight: 700,
+                                    letterSpacing: '0.05em', transition: 'all 0.2s'
+                                }}
+                            >
+                                ⬇ CSV
+                            </button>
+                        </div>
 
-                                    {/* 1st Leg Columns */}
-                                    <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Pts</th>
-                                    <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Gen</th>
-                                    {expandedVuelta !== 1 && <th className="summary-col hide-mobile">Pts</th>}
-
-                                    {/* 2nd Leg Columns */}
-                                    <th className={expandedVuelta === 2 ? '' : 'hide-column'}>Pts</th>
-                                    <th className={expandedVuelta === 2 ? '' : 'hide-column'}>PJ</th>
-                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PG</th>
-                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PE</th>
-                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PP</th>
-                                    <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>GF</th>
-                                    {expandedVuelta !== 2 && <th className="summary-col hide-mobile">Pts</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {h2hStandings.map((team, idx) => (
-                                    <tr key={team.id}>
-                                        <td className="sticky-col-1" style={{ fontWeight: 800 }}>{idx + 1}</td>
-                                        <td className="team-cell sticky-col-2">
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                <motion.img
-                                                    layoutId={`shield-${team.id || team.name}`}
-                                                    src={getTeamShield(team.name)}
-                                                    alt=""
-                                                    loading="lazy"
-                                                    onClick={() => setSelectedDetailTeam(team)}
-                                                    style={{ width: '28px', height: '28px', objectFit: 'contain', cursor: 'pointer' }}
-                                                />
-                                                <span
-                                                    className="clickable-team"
-                                                    onClick={() => setSelectedDetailTeam(team)}
-                                                    style={{ fontWeight: 600, fontSize: '0.8rem', lineHeight: 1.1 }}
-                                                >
-                                                    {team.name}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        {/* Global Scores First */}
-                                        <td className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
-                                        <td className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
-
-                                        {/* 1st Leg Data */}
-                                        <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
-                                        <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_gen}</td>
-                                        {expandedVuelta !== 1 && <td className="summary-col hide-mobile" style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{team.hist_pts}</td>}
-
-                                        {/* 2nd Leg Data */}
-                                        <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.points}</td>
-                                        <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.played}</td>
-                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--success)', fontWeight: 600 }}>{team.won}</td>
-                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.drawn}</td>
-                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--error)' }}>{team.lost}</td>
-                                        <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.gf}</td>
-                                        {expandedVuelta !== 2 && <td className="summary-col hide-mobile" style={{ opacity: 0.6 }}>{team.points}</td>}
+                        {sanctionsMode ? (
+                            /* --- VISTA SANCIONES --- */
+                            <table>
+                                <thead>
+                                    <tr className="table-header-sub">
+                                        <th className="sticky-col-1">Pos</th>
+                                        <th className="sticky-col-2">Equipo</th>
+                                        <th style={{ color: 'var(--error)', fontWeight: 800, textAlign: 'center' }}>💰 Sanciones (€)</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {h2hStandings.map((team, idx) => {
+                                        const total = sanctionsData.teamStats?.[team.id]?.total ?? 0;
+                                        return (
+                                            <tr key={team.id}>
+                                                <td className="sticky-col-1" style={{ fontWeight: 800 }}>{idx + 1}</td>
+                                                <td className="team-cell sticky-col-2">
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <motion.img
+                                                            layoutId={`shield-sanc-${team.id || team.name}`}
+                                                            src={getTeamShield(team.name)}
+                                                            alt=""
+                                                            loading="lazy"
+                                                            onClick={() => setSelectedDetailTeam(team)}
+                                                            style={{ width: '28px', height: '28px', objectFit: 'contain', cursor: 'pointer' }}
+                                                        />
+                                                        <span
+                                                            className="clickable-team"
+                                                            onClick={() => setSelectedDetailTeam(team)}
+                                                            style={{ fontWeight: 600, fontSize: '0.8rem' }}
+                                                        >
+                                                            {team.name}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td style={{
+                                                    textAlign: 'center', fontWeight: 900, fontSize: '1.05rem',
+                                                    color: total > 0 ? 'var(--error)' : 'var(--success)'
+                                                }}>
+                                                    {total > 0 ? `${total.toFixed(2)} €` : '—'}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        ) : (
+                            /* --- VISTA CLASIFICACIÓN NORMAL --- */
+                            <table>
+                                <thead>
+                                    <tr className="table-header-main">
+                                        <th className="sticky-col-1-2" colSpan={2}></th>
+                                        <th colSpan={2} className="hide-mobile" style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
+                                        <th colSpan={2} className="show-mobile-table-cell sticky-col-3-4" style={{ background: 'rgba(59, 130, 246, 0.1)', textAlign: 'center', fontSize: '0.7rem', letterSpacing: '0.1em' }}>GLOBAL</th>
+                                        <th
+                                            colSpan={expandedVuelta === 1 ? 2 : 1}
+                                            className={`clickable-header ${expandedVuelta === 1 ? 'expanded' : 'collapsed'} hide-mobile`}
+                                            onClick={() => setExpandedVuelta(expandedVuelta === 1 ? null : 1)}
+                                            style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center', cursor: 'pointer' }}
+                                        >
+                                            <span className="hide-mobile">{expandedVuelta === 1 ? '1ª Vuelta' : '1ª V'}</span>
+                                            <span className="show-mobile-inline">{expandedVuelta === 1 ? '1ªV' : '1ªV'}</span>
+                                            {expandedVuelta === 1 ? ' ▾' : ' ▸'}
+                                        </th>
+                                        <th
+                                            colSpan={expandedVuelta === 2 ? 6 : 1}
+                                            className={`clickable-header ${expandedVuelta === 2 ? 'expanded' : 'collapsed'} hide-mobile`}
+                                            onClick={() => setExpandedVuelta(expandedVuelta === 2 ? null : 2)}
+                                            style={{ background: 'rgba(168, 85, 247, 0.05)', textAlign: 'center', cursor: 'pointer' }}
+                                        >
+                                            <span className="hide-mobile">{expandedVuelta === 2 ? '2ª Vuelta' : '2ª V'}</span>
+                                            <span className="show-mobile-inline">{expandedVuelta === 2 ? '2ªV' : '2ªV'}</span>
+                                            {expandedVuelta === 2 ? ' ▾' : ' ▸'}
+                                        </th>
+                                    </tr>
+                                    <tr className="table-header-sub">
+                                        <th className="sticky-col-1">Pos</th><th className="sticky-col-2">Equipo</th>
+                                        <th className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
+                                        <th className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
+
+                                        {/* 1st Leg Columns */}
+                                        <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Pts</th>
+                                        <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Gen</th>
+                                        {expandedVuelta !== 1 && <th className="summary-col hide-mobile">Pts</th>}
+
+                                        {/* 2nd Leg Columns */}
+                                        <th className={expandedVuelta === 2 ? '' : 'hide-column'}>Pts</th>
+                                        <th className={expandedVuelta === 2 ? '' : 'hide-column'}>PJ</th>
+                                        <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PG</th>
+                                        <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PE</th>
+                                        <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PP</th>
+                                        <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>GF</th>
+                                        {expandedVuelta !== 2 && <th className="summary-col hide-mobile">Pts</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {h2hStandings.map((team, idx) => (
+                                        <tr key={team.id}>
+                                            <td className="sticky-col-1" style={{ fontWeight: 800 }}>{idx + 1}</td>
+                                            <td className="team-cell sticky-col-2">
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                    <motion.img
+                                                        layoutId={`shield-${team.id || team.name}`}
+                                                        src={getTeamShield(team.name)}
+                                                        alt=""
+                                                        loading="lazy"
+                                                        onClick={() => setSelectedDetailTeam(team)}
+                                                        style={{ width: '28px', height: '28px', objectFit: 'contain', cursor: 'pointer' }}
+                                                    />
+                                                    <span
+                                                        className="clickable-team"
+                                                        onClick={() => setSelectedDetailTeam(team)}
+                                                        style={{ fontWeight: 600, fontSize: '0.8rem', lineHeight: 1.1 }}
+                                                    >
+                                                        {team.name}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            {/* Global Scores First */}
+                                            <td className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
+                                            <td className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
+
+                                            {/* 1st Leg Data */}
+                                            <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
+                                            <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_gen}</td>
+                                            {expandedVuelta !== 1 && <td className="summary-col hide-mobile" style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{team.hist_pts}</td>}
+
+                                            {/* 2nd Leg Data */}
+                                            <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.points}</td>
+                                            <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.played}</td>
+                                            <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--success)', fontWeight: 600 }}>{team.won}</td>
+                                            <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.drawn}</td>
+                                            <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--error)' }}>{team.lost}</td>
+                                            <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.gf}</td>
+                                            {expandedVuelta !== 2 && <td className="summary-col hide-mobile" style={{ opacity: 0.6 }}>{team.points}</td>}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 );
+            }
             case 'teams':
                 return <TeamsPanel h2hStandings={h2hStandings} onTeamClick={setSelectedDetailTeam} />;
             case 'captains':

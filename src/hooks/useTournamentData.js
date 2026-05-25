@@ -816,6 +816,20 @@ export const useTournamentData = (activeTab) => {
                             setLoadingAllLineups(false);
                             if (!isLive) lastCalculationDigest.current = digest;
                             isFetching.current = false;
+
+                            // FIX Calendario: Sincronizar TODOS los rounds del caché al estado
+                            // para que CalendarPanel muestre resultados de todas las jornadas.
+                            setAllRounds(prev => prev.map(r => {
+                                if (historicalCache.current[r._id]?.matches?.length > 0) {
+                                    return { ...r, matches: historicalCache.current[r._id].matches };
+                                }
+                                // Fallback: buscar por número de jornada (ej: J23 con _id recuperado)
+                                const byNum = Object.values(historicalCache.current).find(rd => rd.number === r.number);
+                                if (byNum?.matches?.length > 0) {
+                                    return { ...r, matches: byNum.matches };
+                                }
+                                return r;
+                            }));
                         } else if (type === 'CALCULATION_ERROR') {
                             console.error('[Worker Error Callback]', error);
                             isFetching.current = false;

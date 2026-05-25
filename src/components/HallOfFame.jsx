@@ -41,6 +41,12 @@ const champions = [
         tournament: 'Copa Piraña',
         team: 'SICARIOS CF',
         type: 'cup'
+    },
+    {
+        year: '2025/26',
+        tournament: 'Fuentmondo',
+        team: 'Larios Limon FC',
+        type: 'league'
     }
 ];
 
