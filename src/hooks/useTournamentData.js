@@ -247,6 +247,15 @@ export const useTournamentData = (activeTab) => {
                                     hasScores: m.m && m.m.length > 0
                                 };
                             });
+                        } else {
+                            // FIX: Fallback para temporada terminada.
+                            // Si la API de calendario no devuelve datos para este round
+                            // (ej: /5/ranking/matches vacío al acabar la temporada),
+                            // usamos la fecha del round original para determinar el estado.
+                            const roundDate = roundObj?.date ? new Date(roundObj.date) : null;
+                            if (roundDate && roundDate < now) {
+                                status = 'past';
+                            }
                         }
                     }
 
@@ -254,6 +263,10 @@ export const useTournamentData = (activeTab) => {
                         _id: roundId,
                         number: jornada,
                         status,
+                        // FIX: Preservar la fecha del round original.
+                        // Sin esto, calculateTournamentWideData no puede identificar
+                        // rounds pasados cuando el status queda como 'future'.
+                        date: roundObj?.date || null,
                         matches: matchesData
                     });
                 }
@@ -595,7 +608,8 @@ export const useTournamentData = (activeTab) => {
         try {
             const allRoundDataCombined = [];
             // Batch fetch historical rankings for ALL past rounds
-            const neededFetch = roundsToFetch.filter(r => !historicalCache.current[r._id]);
+            // FIX: Excluir rounds sin _id de string válido (placeholders históricos o sin datos de API)
+            const neededFetch = roundsToFetch.filter(r => typeof r._id === 'string' && !historicalCache.current[r._id]);
             const batchSizeFetch = 2; // Reduced for reliability
             for (let i = 0; i < neededFetch.length; i += batchSizeFetch) {
                 const batch = neededFetch.slice(i, i + batchSizeFetch);
