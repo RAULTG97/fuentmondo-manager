@@ -200,6 +200,7 @@ export const useTournamentData = (activeTab) => {
                 }
 
                 // Create all 38 rounds
+                const now = new Date();
                 const all38Rounds = [];
                 for (let jornada = 1; jornada <= 38; jornada++) {
                     let status = 'future';
