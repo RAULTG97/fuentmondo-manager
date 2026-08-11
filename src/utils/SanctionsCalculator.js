@@ -47,7 +47,7 @@ export function calculateSanctions(roundsData, teamList = []) {
     const infractions = [];
 
     // 1. Historical Processing (J1-J19)
-    processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts, sanctionsRegistry, infractions);
+    processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts, sanctionsRegistry, infractions, matches_out, matches_no_captain);
 
     // 2. Tournament Rounds Processing
     const sortedRounds = [...roundsData].sort((a, b) => (a.number || 0) - (b.number || 0));
@@ -99,7 +99,7 @@ function createInitialTeamStats(id, name) {
 /**
  * Logic for historical data processing
  */
-function processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts, sanctionsRegistry, infractions) {
+function processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts, sanctionsRegistry, infractions, matches_out, matches_no_captain) {
     const allHistoricalRounds = Object.keys(historicalCaptains).map(Number).sort((a, b) => a - b);
 
     allHistoricalRounds.forEach(rNum => {
@@ -147,8 +147,8 @@ function processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts,
             if (count > 0 && count % 3 === 0) {
                 if (!sanctionsRegistry[teamId]) sanctionsRegistry[teamId] = {};
                 sanctionsRegistry[teamId][normPlayer] = {
-                    outTeamUntil: rNum + 3,
-                    noCaptUntil: rNum + 6,
+                    outTeamUntil: rNum + matches_out,
+                    noCaptUntil: rNum + matches_no_captain,
                     playerName
                 };
             }
@@ -246,8 +246,8 @@ function processRound(round, teamStats, teamCaptainCounts, sanctionsRegistry, in
                     if (count > 0 && count % 3 === 0) {
                         if (!sanctionsRegistry[teamId]) sanctionsRegistry[teamId] = {};
                         sanctionsRegistry[teamId][normP] = {
-                            outTeamUntil: round.number + 3,
-                            noCaptUntil: round.number + 6,
+                            outTeamUntil: round.number + mOut,
+                            noCaptUntil: round.number + mNoCapt,
                             playerName: p.name
                         };
                     }

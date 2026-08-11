@@ -23,15 +23,16 @@ export const CONFIG = {
             name: "COPA PIRAÑA",
             dataSourceChamp: "espana",
             userteamId: "69766337c15cdb2bd57b94c0",
-            type: "copa"
+            type: "copa",
+            hidden: true  // Copa Piraña oculta hasta que empiece (nueva temporada)
         }
     ],
 
     // Sanction Rules
     SANCTION_RULES: {
-        matches_out: 3,
-        matches_no_captain: 6,
-        captaincy_threshold: 3
+        matches_out: 3,           // Jornadas sin poder alinear al jugador sancionado
+        matches_no_captain: 5,    // Jornadas sin poder usar como capitán (temporada 26/27: era 6)
+        captaincy_threshold: 3    // Capitanías acumuladas para generar sanción
     },
 
     // WhatsApp Bot Config

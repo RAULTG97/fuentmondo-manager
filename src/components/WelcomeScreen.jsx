@@ -4,6 +4,7 @@ import { APP_LOGO, INTRO_CHAMPIONS, INTRO_LIGA_ML, INTRO_COPA } from '../utils/a
 import { Bell } from 'lucide-react';
 import { FirebaseService } from '../services/firebaseService';
 import { useToast } from '../context/ToastContext';
+import { CONFIG } from '../config';
 import './WelcomeScreen.css';
 
 const containerVariants = {
@@ -83,6 +84,15 @@ const WelcomeScreen = ({ championships, onSelect }) => {
             onSelect(found._id);
         }
     };
+
+    // Determine which competitions are visible (exclude those marked hidden in CONFIG)
+    const hiddenSearchKeys = CONFIG.CHAMPIONSHIPS
+        .filter(c => c.hidden)
+        .map(c => c.name.toUpperCase());
+
+    const visibleCompetitions = competitions.filter(comp =>
+        !hiddenSearchKeys.some(hk => hk.includes(comp.searchKey) || comp.searchKey.includes(hk.split(' ')[0]))
+    );
 
     const [showNotificationModal, setShowNotificationModal] = React.useState(false);
 
@@ -198,7 +208,7 @@ const WelcomeScreen = ({ championships, onSelect }) => {
                 </motion.header>
 
                 <motion.div className="competition-selector" variants={containerVariants}>
-                    {competitions.map((comp) => (
+                    {visibleCompetitions.map((comp) => (
                         <motion.button
                             key={comp.id}
                             className="comp-card"
