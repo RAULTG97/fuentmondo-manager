@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { getTeamShield } from '../utils/assets';
+import { getTeamShield, getAssetPath } from '../utils/assets';
 import './CalendarPanel.css';
 
 const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick, onMatchClick }) => {
-    // Filter rounds from 20 to 38
+    // Show all available rounds
     const calendarRounds = useMemo(() =>
-        allRounds.filter(r => r.number >= 20 && r.number <= 38).sort((a, b) => a.number - b.number)
+        allRounds.sort((a, b) => a.number - b.number)
         , [allRounds]);
 
     // Create a matrix: teamId -> { roundNumber -> matchInfo }
@@ -88,6 +88,7 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick, onMatchClick }) =
                                             src={getTeamShield(team.name)}
                                             alt={team.name}
                                             className="team-shield-large"
+                                            onError={(e) => { e.target.onerror = null; e.target.src = getAssetPath('/escudos/enigma.jpeg'); }}
                                         />
                                     </div>
                                 </td>
@@ -107,6 +108,7 @@ const CalendarPanel = ({ allRounds, h2hStandings, onTeamClick, onMatchClick }) =
                                                     alt={match.opponentName}
                                                     className="opp-shield-micro"
                                                     title={`${team.name} vs ${match.opponentName}`}
+                                                    onError={(e) => { e.target.onerror = null; e.target.src = getAssetPath('/escudos/enigma.jpeg'); }}
                                                 />
                                                 {match.result && (
                                                     <div className={`result-overlay result-${match.result}`}>

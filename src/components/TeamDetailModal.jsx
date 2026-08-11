@@ -311,6 +311,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                                 layoutId={`shield-${teamId || teamName}`}
                                 src={getTeamShield(teamName)}
                                 alt={teamName}
+                                onError={(e) => { e.target.onerror = null; e.target.src = getTeamShield('enigma'); }}
                             />
                         </div>
                         <div className="header-title-box">
@@ -369,8 +370,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                                     </>
                                 ) : (
                                     <>
-                                        <div className="stat-row"><span>1ª Vuelta (Excel)</span> <strong>{fullStats.hist_pts || 0} pts</strong></div>
-                                        <div className="stat-row"><span>2ª Vuelta (API)</span> <strong>{fullStats.points || 0} pts</strong></div>
+                                        <div className="stat-row"><span>Puntos Totales</span> <strong>{fullStats.points || 0} pts</strong></div>
                                         <div className="stat-row"><span>Partidos Jugados</span> <strong>{fullStats.played || 0}</strong></div>
                                         <div className="stat-row"><span>V - E - D</span> <strong>{fullStats.won || 0}-{fullStats.drawn || 0}-{fullStats.lost || 0}</strong></div>
                                     </>

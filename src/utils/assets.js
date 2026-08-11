@@ -1,31 +1,41 @@
 import { getAssetPath } from './path';
 
+export { getAssetPath };
+
+import shieldMap from '../data/shieldMap.json';
+
+const normalizeForMap = (str) => {
+    if (!str) return '';
+    return str
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toLowerCase();
+};
+
 export const getTeamShield = (teamName) => {
     if (!teamName) return null;
 
-    // 1. Basic normalization: trim and collapse multiple spaces (important for Charo la   Picanta)
     let cleanName = teamName.trim().replace(/\s+/g, ' ');
+    const norm = normalizeForMap(cleanName);
 
-    // 2. Specific fixes for known mismatches between API names and filenames
+    // 1. Check dynamic mapping first
+    if (shieldMap[norm]) {
+        return getAssetPath(`/escudos/${shieldMap[norm]}`);
+    }
 
-    // Samba Rovinha: API uses flags at start/end, filename only at end
+    // 2. Specific fixes for known mismatches if not caught by normalization
     if (cleanName.includes('Samba Rovinha')) {
         return getAssetPath('/escudos/Samba Rovinha 🇧🇷.jpeg');
     }
-
-    // Los Pokémon: API emoji order vs filename emoji order
     if (cleanName.includes('LOS POKÉMON')) {
         return getAssetPath('/escudos/LOS POKÉMON 🟡🐭🟡.jpeg');
     }
-
-    // Tetitas Colesterol: filename has extra dots or spaces
     if (cleanName.includes('Tetitas Colesterol')) {
         return getAssetPath('/escudos/Tetitas Colesterol . F.C.jpeg');
     }
 
-    // Elche: API might say something else? List dir had "Elche pero Peor"
-
-    // Handle the .jpeg extension and URL encoding
+    // 3. Fallback: URL encode clean name with .jpeg
     return getAssetPath(`/escudos/${encodeURIComponent(cleanName)}.jpeg`);
 };
 

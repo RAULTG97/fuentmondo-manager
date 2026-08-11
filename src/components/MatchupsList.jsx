@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { getTeamShield } from '../utils/assets';
+import { getTeamShield, getAssetPath } from '../utils/assets';
 
 const container = {
     hidden: { opacity: 0 },
@@ -124,7 +124,7 @@ function MatchupsList({ matches, onMatchClick, isLiveRound, roundStatus }) {
                                         src={getTeamShield(homeName)}
                                         alt={homeName}
                                         className="team-shield"
-                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                        onError={(e) => { e.target.onerror = null; e.target.src = getAssetPath('/escudos/enigma.jpeg'); }}
                                         loading="lazy"
                                     />
                                 </div>
@@ -172,7 +172,7 @@ function MatchupsList({ matches, onMatchClick, isLiveRound, roundStatus }) {
                                         src={getTeamShield(awayName)}
                                         alt={awayName}
                                         className="team-shield"
-                                        onError={(e) => { e.target.style.display = 'none'; }}
+                                        onError={(e) => { e.target.onerror = null; e.target.src = getAssetPath('/escudos/enigma.jpeg'); }}
                                         loading="lazy"
                                     />
                                 </div>

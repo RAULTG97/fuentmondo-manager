@@ -1,6 +1,6 @@
 /**
  * Fuentmondo Manager - Tournament Web Worker (Vite Optimized)
- * Optimized version: Import using absolute paths or ensure Vite worker build.
+ * Season 26/27: No historical file – all data from API.
  */
 
 import { calculateH2HStandings } from '../utils/StandingsCalculator.js';
@@ -11,20 +11,18 @@ self.onmessage = async (e) => {
 
     try {
         switch (type) {
-            case 'CALCULATE_ALL':
+            case 'CALCULATE_ALL': {
                 const { roundsData, teamList, championshipName } = payload;
                 if (championshipName) teamList.__championshipName = championshipName;
 
-                // Perform calculations
-                const standings = calculateH2HStandings(roundsData);
+                // Pass full teamList so teams with 0 matches still appear in standings
+                const standings = calculateH2HStandings(roundsData, teamList);
                 const sanctions = calculateSanctions(roundsData, teamList);
 
                 // ENRICHMENT: Inject lastMatchData into standings teams
-                // This was previously lost during the migration to the worker
                 const standingsWithEnrichment = standings.map(team => {
                     const tid = team.id || team._id;
 
-                    // Find the last round where this team actually played
                     const playedRounds = [...roundsData]
                         .sort((a, b) => (b.number || 0) - (a.number || 0))
                         .filter(r => r.matches && r.matches.some(m => m.homeTeamId === tid || m.awayTeamId === tid));
@@ -50,14 +48,16 @@ self.onmessage = async (e) => {
                     payload: { standings: standingsWithEnrichment, sanctions }
                 });
                 break;
+            }
 
-            case 'CALCULATE_STANDINGS':
-                const resStandings = calculateH2HStandings(payload.roundsData);
+            case 'CALCULATE_STANDINGS': {
+                const resStandings = calculateH2HStandings(payload.roundsData, payload.teamList || []);
                 self.postMessage({
                     type: 'STANDINGS_SUCCESS',
                     payload: resStandings
                 });
                 break;
+            }
 
             default:
                 console.warn('[Worker] Unknown message type:', type);

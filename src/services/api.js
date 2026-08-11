@@ -169,7 +169,7 @@ export const getInternalRankingMatches = async (championshipId, isLive = false) 
         if (cached) return cached;
     }
 
-    const data = await internalPost('/5/ranking/matches', { championshipId });
+    const data = await internalPost('/5/ranking/matches', { championshipId, rounds: true });
 
     const ttl = isLive ? 60 * 1000 : 60 * 60 * 1000; // 1 min live, 1 hour otherwise
     apiCache.set(key, data, ttl);

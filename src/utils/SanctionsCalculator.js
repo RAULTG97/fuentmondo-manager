@@ -3,8 +3,6 @@
  * Optimized for performance and readability.
  */
 
-import historicalCaptains from '../data/historical_captains.json';
-import historicalFines from '../data/historical_fines.json';
 import { resolveTeamName, normalizeName } from './TeamResolver';
 import { CONFIG } from '../config';
 
@@ -46,9 +44,6 @@ export function calculateSanctions(roundsData, teamList = []) {
     const sanctionsRegistry = {}; // { teamId: { normalizedPlayer: { outTeamUntil, noCaptUntil } } }
     const infractions = [];
 
-    // 1. Historical Processing (J1-J19)
-    processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts, sanctionsRegistry, infractions, matches_out, matches_no_captain);
-
     // 2. Tournament Rounds Processing
     const sortedRounds = [...roundsData].sort((a, b) => (a.number || 0) - (b.number || 0));
 
@@ -72,9 +67,6 @@ export function calculateSanctions(roundsData, teamList = []) {
     // 3. Copa Special Fees
     applyCopaFees(teamList, teamStats);
 
-    // 4. Multas 1ª Vuelta (datos históricos pre-calculados)
-    applyHistoricalFines(teamList, teamStats);
-
     return {
         teamStats,
         infractions,
@@ -89,72 +81,16 @@ function createInitialTeamStats(id, name) {
     return {
         id,
         name,
-        total: 0,
-        breakdown: [],
+        total: 25,
+        breakdown: [
+            { round: 0, type: 'TASA DE INSCRIPCIÓN', detail: 'Cuota inicio de temporada', cost: 25 }
+        ],
         captainHistory: [],
         roundActivity: {}
     };
 }
 
-/**
- * Logic for historical data processing
- */
-function processHistoricalData(teamStats, normalizedNameToId, teamCaptainCounts, sanctionsRegistry, infractions, matches_out, matches_no_captain) {
-    const allHistoricalRounds = Object.keys(historicalCaptains).map(Number).sort((a, b) => a - b);
 
-    allHistoricalRounds.forEach(rNum => {
-        const roundData = historicalCaptains[rNum];
-        Object.keys(roundData).forEach(histName => {
-            const teamId = normalizedNameToId[cachedResolveTeam(histName)];
-            if (!teamId) return;
-
-            const playerName = roundData[histName];
-            if (!playerName || playerName === 'N/A') return;
-
-            const normPlayer = cachedNormalize(playerName);
-
-            // Check existing sanctions
-            const active = sanctionsRegistry[teamId]?.[normPlayer];
-            if (active) {
-                // Note: We identify infractions for historical data but we DO NOT register them
-                // because their financial cost is already included in the historical_fines.json
-                // from the first half of the season.
-                /*
-                const infType = rNum <= active.outTeamUntil ? 'Alineación Sancionado' :
-                    (rNum <= active.noCaptUntil ? 'Capitán Sancionado' : null);
-
-                if (infType) {
-                    registerInfraction(teamId, playerName, rNum, `Infracción Histórica: ${infType}`, teamStats, infractions);
-                }
-                */
-            }
-
-            // Update captain counts & history
-            if (!teamCaptainCounts[teamId]) teamCaptainCounts[teamId] = {};
-            teamCaptainCounts[teamId][normPlayer] = (teamCaptainCounts[teamId][normPlayer] || 0) + 1;
-            const count = teamCaptainCounts[teamId][normPlayer];
-
-            teamStats[teamId].captainHistory.push({
-                round: rNum,
-                player: playerName,
-                count,
-                warning: count % 3 === 2,
-                alert: count % 3 === 0,
-                isHistorical: true
-            });
-
-            // Set New Sanction
-            if (count > 0 && count % 3 === 0) {
-                if (!sanctionsRegistry[teamId]) sanctionsRegistry[teamId] = {};
-                sanctionsRegistry[teamId][normPlayer] = {
-                    outTeamUntil: rNum + matches_out,
-                    noCaptUntil: rNum + matches_no_captain,
-                    playerName
-                };
-            }
-        });
-    });
-}
 
 /**
  * Logic for single round processing
@@ -319,35 +255,6 @@ function applyPerformancePenalties(round, data, teamStats) {
             }
         });
     }
-}
-
-/**
- * Suma las multas de la primera vuelta (historical_fines.json) al total de cada equipo.
- * Se llama al final del cálculo para incluir tanto J1-J19 como J20-J38.
- */
-function applyHistoricalFines(teamList, teamStats) {
-    // Mapa normalizado: nombre resuelto -> teamId
-    const nameToId = {};
-    teamList.forEach(team => {
-        const tid = team.id || team._id;
-        if (tid) nameToId[cachedResolveTeam(team.name)] = tid;
-    });
-
-    Object.entries(historicalFines).forEach(([teamName, amount]) => {
-        if (!amount || amount <= 0) return;
-        const resolvedKey = cachedResolveTeam(teamName);
-        const teamId = nameToId[resolvedKey];
-        if (!teamId || !teamStats[teamId]) return;
-
-        teamStats[teamId].total += amount;
-        // Añadir al principio del desglose para visibilidad
-        teamStats[teamId].breakdown.unshift({
-            round: 0,
-            type: 'Multas 1ª Vuelta',
-            detail: 'Acumulado jornadas 1-19',
-            cost: amount
-        });
-    });
 }
 
 /**

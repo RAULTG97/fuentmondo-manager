@@ -33,7 +33,7 @@ const champions = [
     {
         year: '2025',
         tournament: 'Copa Piraña',
-        team: 'AL-CARRER F.C.',
+        team: 'AL-CARRER C.C.',
         type: 'cup'
     },
     {

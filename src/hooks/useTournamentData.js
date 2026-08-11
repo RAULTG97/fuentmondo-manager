@@ -108,26 +108,27 @@ export const useTournamentData = (activeTab) => {
                     if (!r.date && r.matches?.length > 0) r.date = r.matches[0].date;
                 });
 
-                // For league championships, create all 38 rounds
+                // For league championships, create rounds dynamically based on what the API returns
+                // Number of teams × 2 - 2 = total rounds (or just use the max round number in API)
                 if (championship.type !== 'copa') {
-                    const all38Rounds = [];
-                    for (let i = 1; i <= 38; i++) {
+                    const maxRound = rList.length > 0 ? Math.max(...rList.map(r => r.number)) : 38;
+                    const totalRounds = maxRound;
+                    const allApiRounds = [];
+                    for (let i = 1; i <= totalRounds; i++) {
                         const existingRound = rList.find(r => r.number === i);
                         if (existingRound) {
-                            // Preserve EXISTING _id (it's a MongoDB string), but use number for navigation
-                            all38Rounds.push({ ...existingRound });
+                            allApiRounds.push({ ...existingRound });
                         } else {
-                            // Create placeholder for rounds not in API (1-19 are historical)
-                            all38Rounds.push({
-                                _id: i, // Use number as ID for historical/placeholder only
+                            allApiRounds.push({
+                                _id: i, // placeholder ID
                                 number: i,
-                                isHistorical: i <= 19,
+                                isHistorical: false,
                                 matches: []
                             });
                         }
                     }
-                    all38Rounds.sort((a, b) => b.number - a.number);
-                    setRounds(all38Rounds);
+                    allApiRounds.sort((a, b) => b.number - a.number);
+                    setRounds(allApiRounds);
 
                     // Find current round or latest available
                     const now = new Date();
@@ -190,7 +191,7 @@ export const useTournamentData = (activeTab) => {
                 if (currentRoundData && currentRoundData.length > 0) {
                     const firstMatch = currentRoundData[0];
                     if (firstMatch?.id?.r) {
-                        currentJornada = firstMatch.id.r + 19; // r=1 -> Jornada 20
+                        currentJornada = firstMatch.id.r;
                     }
                 }
 
@@ -199,10 +200,11 @@ export const useTournamentData = (activeTab) => {
                     // We'll calculate it after creating all38Rounds
                 }
 
-                // Create all 38 rounds
+                // Create all rounds dynamically (based on API calendar data)
                 const now = new Date();
+                const totalJornadas = Math.max(rounds.length, apiRounds.length);
                 const all38Rounds = [];
-                for (let jornada = 1; jornada <= 38; jornada++) {
+                for (let jornada = 1; jornada <= totalJornadas; jornada++) {
                     let status = 'future';
                     let matchesData = null;
 
@@ -210,11 +212,8 @@ export const useTournamentData = (activeTab) => {
                     const roundObj = rounds.find(r => r.number === jornada);
                     const roundId = roundObj?._id;
 
-                    if (jornada <= 19) {
-                        status = 'historical';
-                    } else {
-                        const apiRoundIndex = jornada - 20; // Jornada 20 -> index 0
-                        const apiRoundData = apiRounds[apiRoundIndex];
+                    const apiRoundIndex = jornada - 1; // Jornada 1 -> index 0
+                    const apiRoundData = apiRounds[apiRoundIndex];
 
                         if (apiRoundData && apiRoundData.length > 0) {
                             // Check if this round has scores (m field)
@@ -258,7 +257,6 @@ export const useTournamentData = (activeTab) => {
                                 status = 'past';
                             }
                         }
-                    }
 
                     all38Rounds.push({
                         _id: roundId,
@@ -279,7 +277,7 @@ export const useTournamentData = (activeTab) => {
                         const highestPlayed = [...playedRounds].sort((a, b) => b.number - a.number)[0];
                         currentJornada = highestPlayed.number;
                     } else {
-                        currentJornada = 20; // Default fallback for leagues
+                        currentJornada = 1; // Default fallback for leagues
                     }
                 }
 
@@ -379,7 +377,7 @@ export const useTournamentData = (activeTab) => {
         if (!selectedRoundId || !championship) return;
 
         // Handle historical rounds for leagues
-        if (championship.type !== 'copa' && typeof selectedRoundId === 'number' && selectedRoundId < 20) {
+        if (championship.type !== 'copa' && typeof selectedRoundId === 'number' && selectedRoundId < 1) {
             setMatches([]);
             setRanking([]);
             if (!isAutoRefresh) setLoadingDisplay(false);
@@ -585,8 +583,8 @@ export const useTournamentData = (activeTab) => {
         const roundsToFetch = allRounds.filter(r => {
             const isPast = (r.date && new Date(r.date) < now) || r.status === 'past' || r.status === 'historical';
             const isCurrent = r.number === currentRoundNumber || r.status === 'current';
-            // We only fetch detailed data for J20+ from API. J1-J19 are in historical file.
-            return (isPast || isCurrent) && (r.number >= 20 || championship.type === 'copa');
+            // We fetch detailed data for all rounds from API.
+            return (isPast || isCurrent);
         });
 
         // --- CACHE INVALIDATION: Force refetch of current and adjacent rounds ---
@@ -746,7 +744,7 @@ export const useTournamentData = (activeTab) => {
                         Object.values(historicalCache.current).find(rd => rd.number === r.number);
 
                     if (enriched && (enriched.number === 23 || enriched.number === currentRoundNumber)) {
-                        return { ...r, matches: [...enriched.matches], styles: 'cached' };
+                        return { ...r, matches: enriched.matches ? [...enriched.matches] : [], styles: 'cached' };
                     }
                     return r;
                 });
@@ -770,22 +768,17 @@ export const useTournamentData = (activeTab) => {
 
                 const sCalc = await import('../utils/SanctionsCalculator');
                 const allTeamsMap = new Map();
+
+                // 1. Add all teams from played rounds (from API ranking)
                 allRoundDataCombined.forEach(rd => rd.ranking?.forEach(t => allTeamsMap.set(t._id, t)));
 
-                // 2. IMPORTANT: Add teams from the historical file (J1-J19) BUT ONLY if they belong to THIS championship
-                const histRankings = await import('../data/historical_rankings.json');
-                const validLeagueTeams = new Set((calendarData?.teams || []).map(t => normalizeName(t.name || t.n)));
-
-                Object.keys(histRankings.default || {}).forEach(name => {
-                    // It belongs to this championship if the API calendar specifically listed it, 
-                    // or if it was found in any real J20+ API round
-                    const belongsToChamp = validLeagueTeams.has(name) || Array.from(allTeamsMap.values()).some(t => normalizeName(t.name) === name);
-
-                    if (belongsToChamp) {
-                        const exists = Array.from(allTeamsMap.values()).some(t => normalizeName(t.name) === name);
-                        if (!exists) {
-                            allTeamsMap.set(name, { _id: name, name: name });
-                        }
+                // 2. Also add ALL teams from calendar (calendarData.teams) as fallback
+                // This guarantees that even if no round has been played yet, all teams appear
+                const calendarTeams = calendarData?.teams || [];
+                calendarTeams.forEach(t => {
+                    const id = t._id || t.id;
+                    if (id && !allTeamsMap.has(id)) {
+                        allTeamsMap.set(id, { _id: id, name: t.name || t.n || 'Unknown' });
                     }
                 });
 
@@ -796,8 +789,9 @@ export const useTournamentData = (activeTab) => {
                     }
                     return rd;
                 }).filter(rd => {
-                    if (rd.number === 23 && rd.matches && rd.matches.length > 0) return true;
-                    return rd.ranking && rd.ranking.length > 0 && rd.matches && rd.matches.length > 0;
+                    // Accept rounds that have matches (with or without ranking – for calendar-based recovery)
+                    if (rd.matches && rd.matches.length > 0) return true;
+                    return rd.ranking && rd.ranking.length > 0;
                 });
 
                 const teamList = Array.from(allTeamsMap.values());

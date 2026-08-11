@@ -36,7 +36,7 @@ import TableSkeleton from './skeletons/TableSkeleton';
 import CardSkeleton from './skeletons/CardSkeleton';
 import PanelSkeleton from './skeletons/PanelSkeleton';
 
-import { getTeamShield } from '../utils/assets';
+import { getTeamShield, getAssetPath } from '../utils/assets';
 import './Dashboard.css';
 
 const Dashboard = ({ championship, championships, onChampionshipChange }) => {
@@ -152,9 +152,9 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                         csv = [header, ...rows].join('\n');
                         filename = `sanciones_${championship.name.replace(/\s+/g,'_')}.csv`;
                     } else {
-                        const header = 'Pos,Equipo,Total Pts,Total Gen,1ª V Pts,1ª V Gen,2ª V Pts,PJ,PG,PE,PP,GF';
+                        const header = 'Pos,Equipo,Pts,GF,PJ,PG,PE,PP,GA';
                         const rows = h2hStandings.map((team, idx) =>
-                            `${idx + 1},"${team.name}",${team.points + team.hist_pts},${team.gf + team.hist_gen},${team.hist_pts},${team.hist_gen},${team.points},${team.played},${team.won},${team.drawn},${team.lost},${team.gf}`
+                            `${idx + 1},"${team.name}",${team.points},${team.gf},${team.played},${team.won},${team.drawn},${team.lost},${team.ga || 0}`
                         );
                         csv = [header, ...rows].join('\n');
                         filename = `clasificacion_${championship.name.replace(/\s+/g,'_')}.csv`;
@@ -226,6 +226,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                                             alt=""
                                                             loading="lazy"
                                                             onClick={() => setSelectedDetailTeam(team)}
+                                                            onError={(e) => { e.target.onerror = null; e.target.src = getAssetPath('/escudos/enigma.jpeg'); }}
                                                             style={{ width: '28px', height: '28px', objectFit: 'contain', cursor: 'pointer' }}
                                                         />
                                                         <span
@@ -254,47 +255,31 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                 <thead>
                                     <tr className="table-header-main">
                                         <th className="sticky-col-1-2" colSpan={2}></th>
-                                        <th colSpan={2} className="hide-mobile" style={{ background: 'rgba(251, 191, 36, 0.05)', textAlign: 'center' }}>Global</th>
-                                        <th colSpan={2} className="show-mobile-table-cell sticky-col-3-4" style={{ background: 'rgba(59, 130, 246, 0.1)', textAlign: 'center', fontSize: '0.7rem', letterSpacing: '0.1em' }}>GLOBAL</th>
-                                        <th
-                                            colSpan={expandedVuelta === 1 ? 2 : 1}
-                                            className={`clickable-header ${expandedVuelta === 1 ? 'expanded' : 'collapsed'} hide-mobile`}
-                                            onClick={() => setExpandedVuelta(expandedVuelta === 1 ? null : 1)}
-                                            style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center', cursor: 'pointer' }}
-                                        >
-                                            <span className="hide-mobile">{expandedVuelta === 1 ? '1ª Vuelta' : '1ª V'}</span>
-                                            <span className="show-mobile-inline">{expandedVuelta === 1 ? '1ªV' : '1ªV'}</span>
-                                            {expandedVuelta === 1 ? ' ▾' : ' ▸'}
-                                        </th>
+                                        <th colSpan={2} className="hide-mobile" style={{ background: 'rgba(59, 130, 246, 0.05)', textAlign: 'center' }}>Temporada 26/27</th>
+                                        <th colSpan={2} className="show-mobile-table-cell sticky-col-3-4" style={{ background: 'rgba(59, 130, 246, 0.1)', textAlign: 'center', fontSize: '0.7rem', letterSpacing: '0.1em' }}>26/27</th>
                                         <th
                                             colSpan={expandedVuelta === 2 ? 6 : 1}
                                             className={`clickable-header ${expandedVuelta === 2 ? 'expanded' : 'collapsed'} hide-mobile`}
                                             onClick={() => setExpandedVuelta(expandedVuelta === 2 ? null : 2)}
                                             style={{ background: 'rgba(168, 85, 247, 0.05)', textAlign: 'center', cursor: 'pointer' }}
                                         >
-                                            <span className="hide-mobile">{expandedVuelta === 2 ? '2ª Vuelta' : '2ª V'}</span>
-                                            <span className="show-mobile-inline">{expandedVuelta === 2 ? '2ªV' : '2ªV'}</span>
+                                            <span className="hide-mobile">{expandedVuelta === 2 ? 'Detalle' : 'Det.'}</span>
                                             {expandedVuelta === 2 ? ' ▾' : ' ▸'}
                                         </th>
                                     </tr>
                                     <tr className="table-header-sub">
                                         <th className="sticky-col-1">Pos</th><th className="sticky-col-2">Equipo</th>
-                                        <th className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 800 }}>Total</th>
+                                        <th className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 800 }}>Pts</th>
                                         <th className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 800 }}>Gen</th>
 
-                                        {/* 1st Leg Columns */}
-                                        <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Pts</th>
-                                        <th className={expandedVuelta === 1 ? '' : 'hide-column'}>Gen</th>
-                                        {expandedVuelta !== 1 && <th className="summary-col hide-mobile">Pts</th>}
-
-                                        {/* 2nd Leg Columns */}
-                                        <th className={expandedVuelta === 2 ? '' : 'hide-column'}>Pts</th>
+                                        {/* Detail Columns */}
                                         <th className={expandedVuelta === 2 ? '' : 'hide-column'}>PJ</th>
                                         <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PG</th>
                                         <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PE</th>
                                         <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>PP</th>
                                         <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>GF</th>
-                                        {expandedVuelta !== 2 && <th className="summary-col hide-mobile">Pts</th>}
+                                        <th className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>GA</th>
+                                        {expandedVuelta !== 2 && <th className="summary-col hide-mobile">PJ</th>}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -309,6 +294,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                                         alt=""
                                                         loading="lazy"
                                                         onClick={() => setSelectedDetailTeam(team)}
+                                                        onError={(e) => { e.target.onerror = null; e.target.src = getAssetPath('/escudos/enigma.jpeg'); }}
                                                         style={{ width: '28px', height: '28px', objectFit: 'contain', cursor: 'pointer' }}
                                                     />
                                                     <span
@@ -320,23 +306,18 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                                                     </span>
                                                 </div>
                                             </td>
-                                            {/* Global Scores First */}
-                                            <td className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points + team.hist_pts}</td>
-                                            <td className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf + team.hist_gen}</td>
+                                            {/* Points & GF */}
+                                            <td className="global-col sticky-col-3" style={{ color: 'var(--primary)', fontWeight: 900 }}>{team.points}</td>
+                                            <td className="global-col sticky-col-4" style={{ color: 'var(--accent)', fontWeight: 900 }}>{team.gf}</td>
 
-                                            {/* 1st Leg Data */}
-                                            <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_pts}</td>
-                                            <td className={expandedVuelta === 1 ? '' : 'hide-column'} style={{ color: 'var(--text-dim)' }}>{team.hist_gen}</td>
-                                            {expandedVuelta !== 1 && <td className="summary-col hide-mobile" style={{ color: 'var(--text-dim)', opacity: 0.6 }}>{team.hist_pts}</td>}
-
-                                            {/* 2nd Leg Data */}
-                                            <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.points}</td>
+                                            {/* Detail Columns */}
                                             <td className={expandedVuelta === 2 ? '' : 'hide-column'}>{team.played}</td>
                                             <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--success)', fontWeight: 600 }}>{team.won}</td>
                                             <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.drawn}</td>
                                             <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--error)' }}>{team.lost}</td>
                                             <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'}>{team.gf}</td>
-                                            {expandedVuelta !== 2 && <td className="summary-col hide-mobile" style={{ opacity: 0.6 }}>{team.points}</td>}
+                                            <td className={expandedVuelta === 2 ? 'hide-mobile' : 'hide-column'} style={{ color: 'var(--error)', opacity: 0.7 }}>{team.ga}</td>
+                                            {expandedVuelta !== 2 && <td className="summary-col hide-mobile" style={{ opacity: 0.6 }}>{team.played}</td>}
                                         </tr>
                                     ))}
                                 </tbody>
@@ -425,7 +406,7 @@ const Dashboard = ({ championship, championships, onChampionshipChange }) => {
                         <PremiumDropdown
                             label="Campeonato Actual"
                             value={championship?._id}
-                            options={championships.map(c => ({ id: c._id, label: c.name }))}
+                            options={championships.filter(c => !c.hidden).map(c => ({ id: c._id, label: c.name }))}
                             onChange={onChampionshipChange}
                             icon={Trophy}
                             className="championship-main"

@@ -5,6 +5,7 @@ import { useTournament } from '../context/TournamentContext';
 import { getTeamShield } from '../utils/assets';
 import EmptyState from './common/EmptyState';
 import { exportSanctionsToPDF } from '../utils/pdfExport';
+import { CONFIG } from '../config';
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -27,8 +28,8 @@ const itemVariants = {
 
 // Helper to calculate active status
 const calculateSanctionStatus = (s, rounds, currentRound) => {
-    const outPeriod = 3;
-    const noCaptPeriod = 6;
+    const outPeriod = CONFIG.SANCTION_RULES.matches_out;
+    const noCaptPeriod = CONFIG.SANCTION_RULES.matches_no_captain;
     const startRound = s.outTeamUntil - outPeriod + 1;
 
     // Simple round-based calculation
@@ -445,7 +446,7 @@ const SanctionedCaptainsPanel = () => {
                     <ShieldAlert size={20} color="var(--primary)" />
                 </div>
                 <p style={{ fontSize: 'var(--font-sm)', color: 'var(--text-muted)', margin: 0 }}>
-                    <strong style={{ color: 'var(--text-main)' }}>Regla de Sanción:</strong> Cada 3ª capitanía conlleva <span style={{ color: 'var(--error)' }}>3 partidos fuera</span> y <span style={{ color: 'var(--warning)' }}>6 partidos sin poder ser elegido capitán</span>.
+                    <strong style={{ color: 'var(--text-main)' }}>Regla de Sanción:</strong> Cada {CONFIG.SANCTION_RULES.captaincy_threshold}ª capitanía conlleva <span style={{ color: 'var(--error)' }}>{CONFIG.SANCTION_RULES.matches_out} partidos fuera</span> y <span style={{ color: 'var(--warning)' }}>{CONFIG.SANCTION_RULES.matches_no_captain} partidos sin poder ser elegido capitán</span>.
                 </p>
             </motion.div>
 
