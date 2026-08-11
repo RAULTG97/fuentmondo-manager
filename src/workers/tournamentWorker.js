@@ -12,7 +12,7 @@ self.onmessage = async (e) => {
     try {
         switch (type) {
             case 'CALCULATE_ALL': {
-                const { roundsData, teamList, championshipName } = payload;
+                const { roundsData, teamList, championshipName, championshipId } = payload;
                 if (championshipName) teamList.__championshipName = championshipName;
 
                 // Pass full teamList so teams with 0 matches still appear in standings
@@ -45,6 +45,7 @@ self.onmessage = async (e) => {
 
                 self.postMessage({
                     type: 'CALCULATION_SUCCESS',
+                    championshipId,  // Reenviar para validar en el hook que la respuesta es del campeonato correcto
                     payload: { standings: standingsWithEnrichment, sanctions }
                 });
                 break;

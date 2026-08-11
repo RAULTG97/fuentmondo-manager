@@ -19,6 +19,7 @@ export const useTournamentData = (activeTab) => {
     const allRoundsRef = useRef([]);
     const workerRef = useRef(null);
     const enrichedRef = useRef(false); // Tracks enrichment state without causing re-renders
+    const activeChampionshipIdRef = useRef(null); // Tracks active championship to validate stale worker responses
 
     // Initialize Worker
     useEffect(() => {
@@ -98,6 +99,9 @@ export const useTournamentData = (activeTab) => {
             historicalCache.current = {};
             enrichedRef.current = false;
             lastCalculationDigest.current = '';
+            isFetching.current = false;  // <-- Liberar mutex para no bloquear el nuevo campeonato
+            // Actualizar la ref del campeonato activo para invalidar respuestas tardías del worker
+            activeChampionshipIdRef.current = championship._id;
 
             const league = championship.dataSourceChamp || 'espana';
             setLoadingDisplay(true);
@@ -808,9 +812,19 @@ export const useTournamentData = (activeTab) => {
 
                 // --- DELEGATE TO WORKER ---
                 if (workerRef.current) {
+                    // Capturar el championship._id en el momento del dispatch para validar la respuesta
+                    const dispatchedChampId = championship._id;
+                    activeChampionshipIdRef.current = dispatchedChampId;
+
                     workerRef.current.onmessage = (event) => {
-                        const { type, payload, error } = event.data;
+                        const { type, payload, error, championshipId: responseChampId } = event.data;
                         if (type === 'CALCULATION_SUCCESS') {
+                            // GUARD: Ignorar respuestas tardías del worker de un campeonato anterior
+                            if (responseChampId && responseChampId !== activeChampionshipIdRef.current) {
+                                console.warn(`[Worker] Respuesta descartada: campeonato ${responseChampId} ya no es el activo (${activeChampionshipIdRef.current})`);
+                                isFetching.current = false;
+                                return;
+                            }
                             const { standings, sanctions } = payload;
                             setH2HStandings(standings);
                             setSanctionsData(sanctions);
@@ -844,7 +858,8 @@ export const useTournamentData = (activeTab) => {
                         payload: {
                             roundsData: filteredRounds,
                             teamList: teamList,
-                            championshipName: championship.name
+                            championshipName: championship.name,
+                            championshipId: championship._id  // Incluir ID para validar en la respuesta
                         }
                     });
                 } else {
