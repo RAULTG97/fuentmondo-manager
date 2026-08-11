@@ -13,6 +13,7 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
         captains: false,
         cupPath: true
     });
+    const [shieldLightboxOpen, setShieldLightboxOpen] = useState(false);
 
     if (!team) return null;
 
@@ -306,7 +307,11 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                 {/* COMPACT REFINED HEADER */}
                 <div className="team-detail-header-compact">
                     <div className="header-top">
-                        <div className="team-detail-shield-small">
+                        <div
+                            className="team-detail-shield-small clickable-shield"
+                            onClick={() => setShieldLightboxOpen(true)}
+                            title="Ver escudo en grande"
+                        >
                             <motion.img
                                 layoutId={`shield-${teamId || teamName}`}
                                 src={getTeamShield(teamName)}
@@ -624,6 +629,86 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
                     </div>
                 </div>
             </motion.div>
+
+            {/* SHIELD LIGHTBOX */}
+            {shieldLightboxOpen && (
+                <motion.div
+                    className="shield-lightbox-overlay"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setShieldLightboxOpen(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(2, 6, 23, 0.92)',
+                        backdropFilter: 'blur(24px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 3000,
+                        cursor: 'zoom-out'
+                    }}
+                >
+                    <motion.div
+                        initial={{ scale: 0.7, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.7, opacity: 0 }}
+                        transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '1.5rem'
+                        }}
+                    >
+                        <button
+                            onClick={() => setShieldLightboxOpen(false)}
+                            style={{
+                                position: 'absolute',
+                                top: '-3rem',
+                                right: '-1rem',
+                                background: 'rgba(239,68,68,0.9)',
+                                border: 'none',
+                                color: 'white',
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                cursor: 'pointer',
+                                fontSize: '1.1rem',
+                                fontWeight: 900,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 1
+                            }}
+                        >
+                            ×
+                        </button>
+                        <img
+                            src={getTeamShield(teamName)}
+                            alt={teamName}
+                            style={{
+                                maxWidth: 'min(80vw, 380px)',
+                                maxHeight: 'min(80vh, 380px)',
+                                objectFit: 'contain',
+                                filter: 'drop-shadow(0 20px 60px rgba(0,0,0,0.8))'
+                            }}
+                        />
+                        <p style={{
+                            color: 'rgba(255,255,255,0.6)',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.1em',
+                            textTransform: 'uppercase'
+                        }}>
+                            {teamName}
+                        </p>
+                    </motion.div>
+                </motion.div>
+            )}
         </div>
     );
 };

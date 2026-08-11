@@ -87,6 +87,17 @@
     object-fit: contain;
 }
 
+.clickable-shield {
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.clickable-shield:hover {
+    transform: scale(1.06);
+    border-color: var(--primary) !important;
+    box-shadow: var(--shadow-md), 0 0 20px rgba(59, 130, 246, 0.25) !important;
+}
+
 .team-detail-name {
     margin: 0;
     font-size: var(--font-2xl);

@@ -78,14 +78,23 @@ export const useTournamentData = (activeTab) => {
 
         let isMounted = true;
         const loadRounds = async () => {
+            // --- RESET COMPLETO AL CAMBIAR DE CAMPEONATO ---
+            // Es crítico resetear TODOS los estados derivados para evitar que datos
+            // del campeonato anterior (equipos, clasificación, calendario) aparezcan
+            // mezclados con los del nuevo campeonato mientras carga.
             setStandingsLoaded(false);
             setH2HStandings([]);
             setMatches([]);
             setRanking([]);
             setSanctionsData({});
             setCupData(null);
+            setCopaAnalysis(null);
             setCalculationProgress(0);
             setAllRounds([]);
+            setRounds([]);           // <-- CRÍTICO: limpiar jornadas del campeonato anterior
+            setCalendarData(null);   // <-- CRÍTICO: limpiar calendario del campeonato anterior
+            setSelectedRoundId(null); // <-- CRÍTICO: limpiar jornada seleccionada
+            setCurrentRoundNumber(null);
             historicalCache.current = {};
             enrichedRef.current = false;
             lastCalculationDigest.current = '';
