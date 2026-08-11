@@ -92,6 +92,8 @@ export const useTournamentData = (activeTab) => {
             setCopaAnalysis(null);
             setCalculationProgress(0);
             setAllRounds([]);
+            allRoundsRef.current = [];
+            allRoundsRef.championshipId = null;
             setRounds([]);           // <-- CRÍTICO: limpiar jornadas del campeonato anterior
             setCalendarData(null);   // <-- CRÍTICO: limpiar calendario del campeonato anterior
             setSelectedRoundId(null); // <-- CRÍTICO: limpiar jornada seleccionada
@@ -192,6 +194,7 @@ export const useTournamentData = (activeTab) => {
                 const data = await fetchWithRetry(getInternalRankingMatches, championship._id, true);
                 if (!isMounted || !data) return;
 
+                data._championshipId = championship._id;
                 setCalendarData(data);
 
                 // Build all 38 rounds with status
@@ -297,6 +300,7 @@ export const useTournamentData = (activeTab) => {
                 setCurrentRoundNumber(currentJornada);
                 setAllRounds(all38Rounds);
                 allRoundsRef.current = all38Rounds;
+                allRoundsRef.championshipId = championship._id;
 
                 // For leagues, if we found a definitive current round from the API, enforce it
                 if (currentJornada) {
@@ -570,6 +574,12 @@ export const useTournamentData = (activeTab) => {
     const calculateTournamentWideData = useCallback(async () => {
         if (!championship || allRounds.length === 0) return;
 
+        // --- GUARD AGAINST STALE allRounds ---
+        if (allRoundsRef.championshipId !== championship._id) {
+            console.log("[CALC] Abortando cálculo porque allRounds pertenece a un campeonato anterior.");
+            return;
+        }
+
         // --- OPTIMIZATION: Check Digest to skip calculation ---
         if (isFetching.current) return;
 
@@ -787,7 +797,7 @@ export const useTournamentData = (activeTab) => {
 
                 // 2. Also add ALL teams from calendar (calendarData.teams) as fallback
                 // This guarantees that even if no round has been played yet, all teams appear
-                const calendarTeams = calendarData?.teams || [];
+                const calendarTeams = calendarData?._championshipId === championship._id ? (calendarData.teams || []) : [];
                 calendarTeams.forEach(t => {
                     const id = t._id || t.id;
                     if (id && !allTeamsMap.has(id)) {
