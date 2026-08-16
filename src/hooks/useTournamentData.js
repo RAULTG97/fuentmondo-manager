@@ -147,7 +147,7 @@ export const useTournamentData = (activeTab) => {
 
                     // Find current round or latest available
                     const now = new Date();
-                    const latestPlayed = all38Rounds.find(r => r.date && new Date(r.date) < now);
+                    const latestPlayed = allApiRounds.find(r => r.date && new Date(r.date) < now);
                     // For leagues, we DO NOT set the default round here anymore to avoid FOUC (flash of wrong round).
                     // We wait for loadCalendar to get the authoritative "current" round.
                     // However, we MUST set selectedRoundId if it is strictly null, but maybe we can wait?
@@ -612,17 +612,23 @@ export const useTournamentData = (activeTab) => {
 
         // --- CACHE INVALIDATION: Force refetch of current and adjacent rounds ---
         // This ensures sanctions and lineups update when a round finishes or starts.
-        roundsToFetch.forEach(r => {
-            // Invalidate current round, suspended rounds (J23), and one before/after
-            const isLiveOrRecent = r.status === 'current' ||
-                Math.abs(r.number - currentRoundNumber) <= 1 ||
-                r.number === 23 ||
-                (r.status === 'past' && r.number === currentRoundNumber);
+        // THROTTLED to avoid infinite loops when setAllRounds triggers this calculation.
+        if (!context.lastCacheInvalidation) context.lastCacheInvalidation = 0;
+        const nowMs = Date.now();
+        if (nowMs - context.lastCacheInvalidation > 60000) {
+            roundsToFetch.forEach(r => {
+                // Invalidate current round, suspended rounds (J23), and one before/after
+                const isLiveOrRecent = r.status === 'current' ||
+                    Math.abs(r.number - currentRoundNumber) <= 1 ||
+                    r.number === 23 ||
+                    (r.status === 'past' && r.number === currentRoundNumber);
 
-            if (isLiveOrRecent) {
-                delete historicalCache.current[r._id];
-            }
-        });
+                if (isLiveOrRecent) {
+                    delete historicalCache.current[r._id];
+                }
+            });
+            context.lastCacheInvalidation = nowMs;
+        }
 
         if (!standingsLoaded) setLoadingStandings(true);
         if (isSanctionView) setLoadingAllLineups(true);
