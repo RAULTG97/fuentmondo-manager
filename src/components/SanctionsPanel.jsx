@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
-import { AlertCircle, ChevronDown, ChevronRight, Euro, Search, Calculator, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { AlertCircle, ChevronDown, ChevronRight, Euro, Search, Loader2 } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
-import { CopaSanctionsService } from '../services/copaSanctionsService';
 import historicalFines from '../data/historical_fines.json';
 
 // Pre-compute normalized map for blurry matching (removes emojis, spaces, accents, and cases)
@@ -44,31 +43,22 @@ function SanctionsPanel({ sanctionsData, isCopa, rounds, championship, champions
     const [expandedTeam, setExpandedTeam] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // WhatsApp State (Mantenemos por si se usa en subcomponentes o lógica futura)
-    const [sendingReport, setSendingReport] = useState(false);
-    const [reportStatus, setReportStatus] = useState(null); // 'success' | 'error'
-
-    // Copa State - RESTAURADO
-    const [loadingCopa, setLoadingCopa] = useState(false);
-    const [copaResult, setCopaResult] = useState(null);
-
-    // Auto-fetch for Copa
-    useEffect(() => {
-        if (isCopa && championshipId && cupData && !copaResult && !loadingCopa) {
-            setLoadingCopa(true);
-            CopaSanctionsService.scanCopaAndCalculate(championshipId, cupData)
-                .then(res => {
-                    setCopaResult(res);
-                })
-                .catch(err => console.error("Error loading Copa sanctions:", err))
-                .finally(() => setLoadingCopa(false));
-        }
-    }, [isCopa, championshipId, cupData]);
-
+    // For Copa: use copaAnalysis loaded centrally by the hook (no redundant API calls here).
+    // For League: use sanctionsData from the context.
     const activeSanctionsData = useMemo(() => {
         if (!isCopa) return sanctionsData;
-        return (copaAnalysis?.teamStats || copaResult?.teamStats || {});
-    }, [isCopa, sanctionsData, copaAnalysis, copaResult]);
+        return (copaAnalysis?.teamStats || {});
+    }, [isCopa, sanctionsData, copaAnalysis]);
+
+    // Copa: show loading state while the central analysis is still running
+    if (isCopa && !copaAnalysis) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem', gap: '1rem', color: 'var(--text-dim)' }}>
+                <Loader2 className="animate-spin" size={32} color="var(--primary)" />
+                <p style={{ margin: 0 }}>Analizando eliminatorias de Copa...</p>
+            </div>
+        );
+    }
 
     if (!isCopa && (!sanctionsData || Object.keys(sanctionsData).length === 0)) {
         return <div className="text-center p-4">Cargando sanciones...</div>;
@@ -95,30 +85,23 @@ function SanctionsPanel({ sanctionsData, isCopa, rounds, championship, champions
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', width: '100%', maxWidth: '800px' }}>
-                    {isCopa && loadingCopa ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
-                            <Loader2 className="animate-spin" size={20} />
-                            <span>Analizando eliminatorias de Copa...</span>
-                        </div>
-                    ) : (
-                        <div className="round-picker" style={{ flex: 1, minWidth: '280px', gap: '0.75rem' }}>
-                            <Search size={18} color="var(--text-dim)" />
-                            <input
-                                type="text"
-                                placeholder="Buscar equipo..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: 'var(--text-main)',
-                                    outline: 'none',
-                                    fontSize: 'var(--font-sm)',
-                                    width: '100%'
-                                }}
-                            />
-                        </div>
-                    )}
+                    <div className="round-picker" style={{ flex: 1, minWidth: '280px', gap: '0.75rem' }}>
+                        <Search size={18} color="var(--text-dim)" />
+                        <input
+                            type="text"
+                            placeholder="Buscar equipo..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-main)',
+                                outline: 'none',
+                                fontSize: 'var(--font-sm)',
+                                width: '100%'
+                            }}
+                        />
+                    </div>
 
                     <div className="round-picker" style={{ gap: '0.8rem', padding: '0.6rem 1rem', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)' }}>
                         <AlertCircle color="#ef4444" size={16} />
@@ -128,13 +111,6 @@ function SanctionsPanel({ sanctionsData, isCopa, rounds, championship, champions
                     </div>
                 </div>
             </div>
-
-            {/* Empty State for Copa before calculation */}
-            {isCopa && !copaResult && !loadingCopa && (
-                <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '12px' }}>
-                    <p>Calculando datos en tiempo real...</p>
-                </div>
-            )}
 
             <div className="grid" style={{ gridTemplateColumns: '1fr', gap: '0.5rem' }}>
                 {sortedTeams.map((team, idx) => {

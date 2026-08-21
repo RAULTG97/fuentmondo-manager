@@ -1,7 +1,6 @@
-import { useState, useMemo, memo, useEffect } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Trophy, AlertTriangle, ShieldAlert, Search, X, Loader2 } from 'lucide-react';
 import { getTeamShield } from '../utils/assets';
-import { CopaSanctionsService } from '../services/copaSanctionsService';
 
 const CaptainRow = memo(({ tid, team, sortedRoundNums }) => (
     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -71,25 +70,13 @@ const CaptainRow = memo(({ tid, team, sortedRoundNums }) => (
 
 function CaptainsPanel({ sanctionsData, rounds, isCopa, cupData, copaAnalysis, championshipId }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [loadingCopa, setLoadingCopa] = useState(false);
-    const [copaStats, setCopaStats] = useState(null);
 
-    // Auto-load Copa data if active
-    useEffect(() => {
-        if (isCopa && championshipId && cupData && !copaStats && !loadingCopa) {
-            setLoadingCopa(true);
-            CopaSanctionsService.scanCopaAndCalculate(championshipId, cupData)
-                .then(result => {
-                    setCopaStats(result.captainHistory);
-                })
-                .catch(err => console.error("Error loading Copa stats:", err))
-                .finally(() => setLoadingCopa(false));
-        }
-    }, [isCopa, championshipId, cupData]); // Removed copaStats/loadingCopa from deps to avoid loops if needed, but safe here with checks
+    // For Copa: use copaAnalysis loaded centrally by the hook (no redundant API calls here).
+    // For League: use sanctionsData from the context.
+    const activeData = isCopa ? (copaAnalysis?.captainHistory || {}) : sanctionsData;
 
-    // Use either prop data (League) or fetched data (Copa)
-    // For Copa, we now prioritize the pre-loaded copaAnalysis from context
-    const activeData = isCopa ? (copaAnalysis?.captainHistory || copaStats || {}) : sanctionsData;
+    // Copa: show a loading state while the central analysis is still running
+    const isLoadingCopa = isCopa && !copaAnalysis;
 
     const teamIds = useMemo(() => {
         const cleanTerm = searchTerm.trim().toLowerCase();
@@ -118,6 +105,15 @@ function CaptainsPanel({ sanctionsData, rounds, isCopa, cupData, copaAnalysis, c
         return <div className="text-center p-4">Cargando historial de capitanes...</div>;
     }
 
+    if (isLoadingCopa) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4rem', gap: '1rem', color: 'var(--text-dim)' }}>
+                <Loader2 className="animate-spin" size={32} color="var(--primary)" />
+                <p style={{ margin: 0 }}>Analizando eliminatorias de Copa...</p>
+            </div>
+        );
+    }
+
     return (
         <div className="captains-panel">
             <div className="dashboard-header" style={{ border: 'none', padding: 0, marginBottom: '2rem', alignItems: 'flex-start' }}>
@@ -129,7 +125,6 @@ function CaptainsPanel({ sanctionsData, rounds, isCopa, cupData, copaAnalysis, c
                         <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)' }}>
                             {teamIds.length} Equipos
                         </span>
-                        {loadingCopa && <Loader2 className="animate-spin" size={20} color="var(--primary)" />}
                     </div>
                 </div>
 

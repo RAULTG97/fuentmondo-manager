@@ -47,9 +47,13 @@ const TeamDetailModal = ({ team, championship, h2hStandings, sanctionsData, roun
     const nextMatchData = React.useMemo(() => {
         if (!allRounds || allRounds.length === 0) return null;
 
-        // Find the next round (first one that is 'future' or 'current')
-        const nextRound = [...allRounds].sort((a, b) => a.number - b.number)
-            .find(r => r.status === 'future' || r.status === 'current');
+        // If there is an active round ('current'), the "next" opponent is the FOLLOWING round ('future').
+        // Only use the 'current' round as "next" if there is no active round yet.
+        const hasCurrent = allRounds.some(r => r.status === 'current');
+        const sortedRounds = [...allRounds].sort((a, b) => a.number - b.number);
+        const nextRound = hasCurrent
+            ? sortedRounds.find(r => r.status === 'future')
+            : sortedRounds.find(r => r.status === 'future' || r.status === 'current');
 
         if (!nextRound || !nextRound.matches) return null;
 

@@ -13,6 +13,14 @@ const RETRY_DELAY = 1000;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Helper: generate a lightweight fingerprint of cupData to detect real changes
+const getCupDataFingerprint = (data) => {
+    if (!data) return '';
+    const rounds = data.rounds || [];
+    const totalMatches = rounds.reduce((sum, r) => sum + (r.matches?.length || 0), 0);
+    return `r${rounds.length}_m${totalMatches}`;
+};
+
 export const useTournamentData = (activeTab) => {
     const context = useTournament();
     const isFetching = useRef(false);
@@ -20,6 +28,7 @@ export const useTournamentData = (activeTab) => {
     const workerRef = useRef(null);
     const enrichedRef = useRef(false); // Tracks enrichment state without causing re-renders
     const activeChampionshipIdRef = useRef(null); // Tracks active championship to validate stale worker responses
+    const lastCupDataRef = useRef(''); // Fingerprint of the cupData that generated the last copaAnalysis
 
     // Initialize Worker
     useEffect(() => {
@@ -101,6 +110,7 @@ export const useTournamentData = (activeTab) => {
             historicalCache.current = {};
             enrichedRef.current = false;
             lastCalculationDigest.current = '';
+            lastCupDataRef.current = '';  // <-- Reset copa fingerprint on championship change
             isFetching.current = false;  // <-- Liberar mutex para no bloquear el nuevo campeonato
             // Actualizar la ref del campeonato activo para invalidar respuestas tardías del worker
             activeChampionshipIdRef.current = championship._id;
@@ -907,15 +917,18 @@ export const useTournamentData = (activeTab) => {
         try {
             const data = await fetchWithRetry(getInternalCup, championship._id);
             setCupData(data);
+            // NOTE: We do NOT reset copaAnalysis here on purpose.
+            // The copa analysis useEffect below will detect meaningful changes
+            // via the fingerprint ref and only recalculate when necessary.
+            // Resetting here was causing the infinite loop:
+            // polling → reset copaAnalysis → panels detect null → re-fetch → loop.
         } catch (err) {
             console.error('[ERROR] Failed to load cup data:', err);
             setCupData(null);
         } finally {
             setLoadingCup(false);
         }
-        // Force reset analysis when championship changes
-        setCopaAnalysis(null);
-    }, [championship, setLoadingCup, setCupData, setCopaAnalysis]);
+    }, [championship, setLoadingCup, setCupData]);
 
     useEffect(() => {
         if (championship?.type === 'copa' && (activeTab === 'copa' || activeTab === 'teams' || activeTab === 'captains' || activeTab === 'sanctions')) {
@@ -935,12 +948,22 @@ export const useTournamentData = (activeTab) => {
     }, [championship, activeTab, loadCupData]);
 
     // 5. Global Copa Analysis
+    // Only recalculates when cupData meaningfully changes (different rounds/matches count).
+    // Uses a fingerprint ref to avoid re-running on every polling cycle.
     useEffect(() => {
-        if (championship?.type === 'copa' && cupData && !copaAnalysis && !loadingCup) {
+        if (championship?.type === 'copa' && cupData && !loadingCup) {
+            const fingerprint = getCupDataFingerprint(cupData);
+
+            // Skip if we already computed analysis for this exact cupData state
+            if (lastCupDataRef.current === fingerprint && copaAnalysis) {
+                return;
+            }
+
             const runAnalysis = async () => {
                 setCalculationProgress(5);
                 try {
                     const result = await CopaSanctionsService.scanCopaAndCalculate(championship._id, cupData);
+                    lastCupDataRef.current = fingerprint; // Mark this fingerprint as analyzed
                     setCopaAnalysis(result);
                 } catch (err) {
                     console.error("[CopaGlobal] Analysis failed:", err);
@@ -950,7 +973,7 @@ export const useTournamentData = (activeTab) => {
             };
             runAnalysis();
         }
-    }, [championship?._id, cupData, copaAnalysis, loadingCup, setCopaAnalysis]);
+    }, [championship?._id, cupData, loadingCup, setCopaAnalysis]);
 
     // 6. Automatic WhatsApp Notification
     useEffect(() => {
