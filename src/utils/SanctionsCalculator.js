@@ -168,7 +168,8 @@ function processRound(round, teamStats, teamCaptainCounts, sanctionsRegistry, in
 
                     teamStats[teamId].captainHistory.push({
                         round: round.number, player: p.name, count,
-                        warning: false, alert: false // No visual warnings for leagues as per user req
+                        warning: count % 3 === 2,
+                        alert: count > 0 && count % 3 === 0
                     });
 
                     // Set New Sanction (still applies: "Alinear un jugador sancionado por capitanía: 5€")
