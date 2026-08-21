@@ -29,6 +29,7 @@ export const useTournamentData = (activeTab) => {
     const enrichedRef = useRef(false); // Tracks enrichment state without causing re-renders
     const activeChampionshipIdRef = useRef(null); // Tracks active championship to validate stale worker responses
     const lastCupDataRef = useRef(''); // Fingerprint of the cupData that generated the last copaAnalysis
+    const lastCacheInvalidation = useRef(0); // Prevents infinite loops by throttling cache invalidation
 
     // Initialize Worker
     useEffect(() => {
@@ -623,9 +624,8 @@ export const useTournamentData = (activeTab) => {
         // --- CACHE INVALIDATION: Force refetch of current and adjacent rounds ---
         // This ensures sanctions and lineups update when a round finishes or starts.
         // THROTTLED to avoid infinite loops when setAllRounds triggers this calculation.
-        if (!context.lastCacheInvalidation) context.lastCacheInvalidation = 0;
         const nowMs = Date.now();
-        if (nowMs - context.lastCacheInvalidation > 60000) {
+        if (nowMs - lastCacheInvalidation.current > 60000) {
             roundsToFetch.forEach(r => {
                 // Invalidate current round, suspended rounds (J23), and one before/after
                 const isLiveOrRecent = r.status === 'current' ||
@@ -637,7 +637,7 @@ export const useTournamentData = (activeTab) => {
                     delete historicalCache.current[r._id];
                 }
             });
-            context.lastCacheInvalidation = nowMs;
+            lastCacheInvalidation.current = nowMs;
         }
 
         if (!standingsLoaded) setLoadingStandings(true);
