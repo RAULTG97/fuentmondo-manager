@@ -189,7 +189,6 @@ function CaptainsPanel({ sanctionsData, rounds, isCopa, cupData, copaAnalysis, c
                                 <th key={rNum} style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #334155', minWidth: '100px', opacity: (rNum <= 19 && !isCopa) ? 0.7 : 1 }}>
                                     {isCopa ? `Ronda ${rNum}` : `J${rNum}`}
                                     {isCopa && (rNum === 1 || rNum === 2) && <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Ida/Vuelta</div>}
-                                    {(!isCopa && rNum <= 19) && <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Invierno</div>}
                                 </th>
                             ))}
                         </tr>
