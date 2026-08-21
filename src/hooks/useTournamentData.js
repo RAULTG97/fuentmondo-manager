@@ -700,7 +700,7 @@ export const useTournamentData = (activeTab) => {
                         console.log("[CALC RECOVERY] Pulling J23 matches from calendar.");
 
                         // Deep copy matches to ensure state updates trigger re-renders
-                        const recoveredMatches = calendarJ23.matches.map(m => ({ ...m }));
+                        const recoveredMatches = calendarJ23.matches.map(m => ({ ...m, enriched: false }));
 
                         // Reconstruct ranking array for tools that depend on it
                         const reconstructedRanking = [];
@@ -729,7 +729,7 @@ export const useTournamentData = (activeTab) => {
             // Enrichment (Penalties/Lineups)
             if (isSanctionView) {
                 const roundsNeedingEnrichment = allRoundDataCombined.filter(rd =>
-                    rd.matches && (rd.matches.some(m => !m.lineupA || m.lineupA.length === 0) || rd.number === 23)
+                    rd.matches && rd.matches.some(m => !m.enriched)
                 );
 
                 console.log(`[ENRICH] Found ${roundsNeedingEnrichment.length} rounds needing enrichment including J23.`);
@@ -862,17 +862,29 @@ export const useTournamentData = (activeTab) => {
 
                             // FIX Calendario: Sincronizar TODOS los rounds del caché al estado
                             // para que CalendarPanel muestre resultados de todas las jornadas.
-                            setAllRounds(prev => prev.map(r => {
-                                if (historicalCache.current[r._id]?.matches?.length > 0) {
-                                    return { ...r, matches: historicalCache.current[r._id].matches };
-                                }
-                                // Fallback: buscar por número de jornada (ej: J23 con _id recuperado)
-                                const byNum = Object.values(historicalCache.current).find(rd => rd.number === r.number);
-                                if (byNum?.matches?.length > 0) {
-                                    return { ...r, matches: byNum.matches };
-                                }
-                                return r;
-                            }));
+                            setAllRounds(prev => {
+                                let hasChanges = false;
+                                const next = prev.map(r => {
+                                    let newMatches = r.matches;
+                                    
+                                    if (historicalCache.current[r._id]?.matches?.length > 0) {
+                                        newMatches = historicalCache.current[r._id].matches;
+                                    } else {
+                                        // Fallback: buscar por número de jornada (ej: J23 con _id recuperado)
+                                        const byNum = Object.values(historicalCache.current).find(rd => rd.number === r.number);
+                                        if (byNum?.matches?.length > 0) {
+                                            newMatches = byNum.matches;
+                                        }
+                                    }
+
+                                    if (newMatches && r.matches !== newMatches) {
+                                        hasChanges = true;
+                                        return { ...r, matches: newMatches };
+                                    }
+                                    return r;
+                                });
+                                return hasChanges ? next : prev;
+                            });
                         } else if (type === 'CALCULATION_ERROR') {
                             console.error('[Worker Error Callback]', error);
                             isFetching.current = false;
